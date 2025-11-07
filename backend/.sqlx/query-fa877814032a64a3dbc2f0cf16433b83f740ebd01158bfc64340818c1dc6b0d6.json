@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM metric_data\n            WHERE collected_at < $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fa877814032a64a3dbc2f0cf16433b83f740ebd01158bfc64340818c1dc6b0d6"
+}

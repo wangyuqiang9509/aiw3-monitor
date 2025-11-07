@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: aiw3-postgres
+    environment:
+      POSTGRES_DB: aiw3_monitor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../backend/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - aiw3-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: aiw3-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - aiw3-network
+    depends_on:
+      - aiw3-monitor
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: aiw3-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning
+      - ../grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+    networks:
+      - aiw3-network
+    depends_on:
+      - prometheus
+
+  aiw3-monitor:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+    container_name: aiw3-monitor
+    ports:
+      - "9090:9090"
+    environment:
+      RUST_LOG: info
+      DATABASE_URL: postgres://postgres:secret@postgres:5432/aiw3_monitor
+    volumes:
+      - ../../backend/config.toml:/app/config.toml
+    networks:
+      - aiw3-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  aiw3-network:
+    driver: bridge
+

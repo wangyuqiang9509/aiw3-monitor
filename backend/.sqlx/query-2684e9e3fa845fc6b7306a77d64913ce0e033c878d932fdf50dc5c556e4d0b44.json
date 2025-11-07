@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, node_id, metric_type as \"metric_type: MetricType\", \n                   metric_value, collected_at, metadata\n            FROM metric_data\n            WHERE node_id = $1 \n              AND metric_type = $2\n              AND collected_at BETWEEN $3 AND $4\n            ORDER BY collected_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "node_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "metric_type: MetricType",
+        "type_info": {
+          "Custom": {
+            "name": "metric_type",
+            "kind": {
+              "Enum": [
+                "blockheight",
+                "blocktime",
+                "nodecount",
+                "txpoolsize",
+                "networklatency",
+                "validatorcount",
+                "tps",
+                "memiavlheight",
+                "blockstmconflicts"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "metric_value",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "collected_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        {
+          "Custom": {
+            "name": "metric_type",
+            "kind": {
+              "Enum": [
+                "blockheight",
+                "blocktime",
+                "nodecount",
+                "txpoolsize",
+                "networklatency",
+                "validatorcount",
+                "tps",
+                "memiavlheight",
+                "blockstmconflicts"
+              ]
+            }
+          }
+        },
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "2684e9e3fa845fc6b7306a77d64913ce0e033c878d932fdf50dc5c556e4d0b44"
+}

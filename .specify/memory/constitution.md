@@ -1,50 +1,236 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# AIW3 Monitor 项目宪章
 
-## Core Principles
+<!--
+======================================================================================
+同步影响报告
+======================================================================================
+版本变更: 初始版本 → 1.0.0
+新增原则:
+  - I. 代码质量第一
+  - II. 测试驱动开发
+  - III. 用户体验一致性
+  - IV. 性能要求
+新增章节:
+  - 开发流程
+  - 质量门禁
+  - 治理规则
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+模板更新状态:
+  ✅ plan-template.md - 已验证宪章检查点兼容性
+  ✅ spec-template.md - 已验证用户场景和需求对齐
+  ✅ tasks-template.md - 已验证任务分类与原则一致
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+待办事项:
+  无
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+======================================================================================
+-->
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+## 核心原则
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### I. 代码质量第一
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**原则声明**:
+所有代码必须满足以下质量标准,这些标准不可协商:
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- **可读性优先**: 代码必须清晰表达意图,使用有意义的命名,适当的注释,符合团队编码规范
+- **模块化设计**: 每个模块、函数、类必须具有单一职责,高内聚低耦合
+- **代码审查强制**: 所有代码变更必须经过至少一位团队成员的代码审查才能合并
+- **静态分析通过**: 所有代码必须通过配置的 linter 和静态分析工具,零警告容忍
+- **文档完整**: 公共 API、复杂逻辑、架构决策必须有清晰的文档说明
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**理由**: 高质量的代码是项目长期可维护性的基础,降低技术债务,提高团队效率,减少生产环境问题。
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### II. 测试驱动开发
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+**原则声明**:
+测试是开发流程的核心部分,必须遵循以下规则:
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- **测试先行 (NON-NEGOTIABLE)**: 所有新功能必须先编写测试,确认测试失败后再实现功能
+- **测试覆盖率要求**: 单元测试覆盖率必须 ≥ 80%,核心业务逻辑必须 ≥ 95%
+- **测试层次完整**:
+  - **单元测试**: 验证单个函数、方法的正确性
+  - **集成测试**: 验证模块间交互、API 契约、数据流
+  - **端到端测试**: 验证关键用户场景的完整流程
+- **测试可维护性**: 测试代码质量与生产代码同等重要,必须清晰、独立、可重复
+- **持续集成**: 所有测试必须在 CI 环境中自动运行,失败阻止合并
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**理由**: 测试驱动开发确保代码正确性,提供安全的重构网,作为活文档记录系统行为,显著降低回归风险。
+
+### III. 用户体验一致性
+
+**原则声明**:
+用户界面和交互必须保持一致性和可预测性:
+
+- **设计系统遵循**: 所有 UI 组件必须遵循统一的设计系统,包括:
+  - 视觉风格: 颜色、字体、间距、图标
+  - 交互模式: 按钮、表单、导航、反馈
+  - 响应式布局: 适配不同设备和屏幕尺寸
+- **可访问性标准**: 必须符合 WCAG 2.1 AA 级别标准:
+  - 键盘导航支持
+  - 屏幕阅读器兼容
+  - 足够的颜色对比度
+  - 清晰的错误提示和帮助信息
+- **用户反馈及时**: 所有用户操作必须有即时反馈(加载状态、成功/失败提示、进度指示)
+- **错误处理友好**: 错误信息必须清晰易懂,提供解决方案或下一步操作建议
+- **性能感知优化**: 即使后端响应慢,也要通过 UI 技巧(骨架屏、乐观更新)提升感知性能
+
+**理由**: 一致的用户体验降低学习成本,提高用户满意度,减少支持负担,增强产品专业性和可信度。
+
+### IV. 性能要求
+
+**原则声明**:
+系统性能是功能需求的一部分,必须满足以下标准:
+
+- **响应时间要求**:
+  - API 端点: P95 延迟 < 200ms (简单查询), < 1s (复杂计算)
+  - 页面加载: 首次内容绘制 (FCP) < 1.5s, 可交互时间 (TTI) < 3s
+  - 用户交互: 响应延迟 < 100ms
+- **资源使用限制**:
+  - 内存占用: 单个服务 < 512MB (正常负载)
+  - CPU 使用: 平均 < 70% (峰值负载)
+  - 数据库连接: 连接池合理配置,避免连接泄漏
+- **并发处理能力**:
+  - 支持至少 100 并发用户无性能降级
+  - 关键操作必须使用异步处理(长时间任务、批量操作)
+- **性能监控**: 必须实施以下监控:
+  - 应用性能监控 (APM): 请求追踪、慢查询识别
+  - 资源监控: CPU、内存、磁盘、网络
+  - 用户体验监控: 真实用户性能数据 (RUM)
+- **性能测试强制**: 所有版本发布前必须通过性能测试,包括负载测试和压力测试
+
+**理由**: 良好的性能直接影响用户满意度和系统可扩展性,性能问题往往是架构问题的早期信号,提前优化比后期重构成本低得多。
+
+## 开发流程
+
+### 功能开发生命周期
+
+1. **需求规范** (Specification Phase):
+   - 使用 `/speckit.spec` 创建功能规范,包含用户场景、验收标准、成功指标
+   - 规范必须经过产品/业务方审核确认
+
+2. **实施计划** (Planning Phase):
+   - 使用 `/speckit.plan` 创建技术实施计划,包含架构设计、技术选型、风险评估
+   - 计划必须通过宪章检查点(Constitution Check)
+
+3. **任务分解** (Task Breakdown Phase):
+   - 使用 `/speckit.tasks` 将计划分解为可执行任务
+   - 任务必须按用户故事分组,支持独立开发和测试
+
+4. **开发实施** (Implementation Phase):
+   - 遵循测试驱动开发: 编写测试 → 测试失败 → 实现功能 → 测试通过 → 重构
+   - 每个任务完成后必须通过代码审查
+
+5. **质量验证** (Quality Assurance Phase):
+   - 运行完整测试套件
+   - 验证性能指标
+   - 确认用户体验一致性
+   - 检查可访问性标准
+
+6. **发布部署** (Release Phase):
+   - 通过所有质量门禁
+   - 更新文档和版本说明
+   - 监控部署后的性能和错误
+
+### 代码审查要求
+
+- **审查者资格**: 至少一位熟悉相关代码领域的团队成员
+- **审查检查清单**:
+  - ✅ 代码符合编码规范和风格指南
+  - ✅ 逻辑清晰,无明显的性能或安全问题
+  - ✅ 测试覆盖充分,测试用例合理
+  - ✅ 文档更新完整
+  - ✅ 无未处理的 linter 警告或错误
+  - ✅ 变更符合宪章原则
+- **审查时效**: 代码审查请求应在 24 小时内响应
+
+## 质量门禁
+
+### 合并前检查 (Pre-Merge Gates)
+
+所有代码合并到主分支前必须通过以下检查:
+
+1. **自动化检查**:
+   - ✅ 所有单元测试通过
+   - ✅ 所有集成测试通过
+   - ✅ 代码覆盖率达标 (≥ 80%)
+   - ✅ Linter 零警告
+   - ✅ 静态安全扫描通过
+   - ✅ 构建成功无错误
+
+2. **人工审查**:
+   - ✅ 至少一位审查者批准
+   - ✅ 所有审查意见已解决
+
+3. **文档检查**:
+   - ✅ 相关文档已更新
+   - ✅ API 变更已记录
+
+### 发布前检查 (Pre-Release Gates)
+
+版本发布前必须额外通过:
+
+1. **性能验证**:
+   - ✅ 性能测试达标
+   - ✅ 无性能回退
+
+2. **端到端验证**:
+   - ✅ 关键用户流程测试通过
+   - ✅ 跨浏览器/设备兼容性测试通过
+
+3. **安全审查**:
+   - ✅ 依赖项安全扫描无高危漏洞
+   - ✅ 代码安全审查通过
+
+## 治理规则
+
+### 宪章权威性
+
+- 本宪章是项目开发的最高指导原则,优先级高于任何其他开发实践或个人偏好
+- 所有代码审查、架构决策必须验证是否符合宪章原则
+- 违反宪章的代码变更不得合并,除非经过明确的例外审批
+
+### 宪章修订程序
+
+1. **提案阶段**: 任何团队成员可提出宪章修订提案,需包含:
+   - 修订原因和背景
+   - 具体变更内容
+   - 影响评估(对现有代码、流程的影响)
+   - 迁移计划(如需要)
+
+2. **讨论阶段**: 提案需经过团队讨论,至少 3 个工作日的意见征集期
+
+3. **批准阶段**: 修订需获得团队负责人或超过 2/3 团队成员的批准
+
+4. **实施阶段**: 
+   - 更新宪章文档,递增版本号
+   - 更新相关模板和文档
+   - 通知所有团队成员
+   - 必要时提供培训
+
+### 版本控制规则
+
+宪章采用语义化版本控制 (MAJOR.MINOR.PATCH):
+
+- **MAJOR**: 移除或重新定义核心原则,向后不兼容的治理变更
+- **MINOR**: 新增原则或章节,实质性扩展指导内容
+- **PATCH**: 澄清说明、修正文字、非语义优化
+
+### 合规性审查
+
+- **日常审查**: 每次代码审查必须验证是否符合宪章
+- **定期审查**: 每季度进行一次宪章合规性审查,评估:
+  - 宪章原则的执行情况
+  - 是否需要调整或新增原则
+  - 质量门禁的有效性
+- **复杂度例外管理**: 
+  - 如果必须违反宪章原则,必须在实施计划的"复杂度跟踪"表格中明确记录
+  - 说明为何需要例外
+  - 阐述为何更简单的替代方案不可行
+  - 需要团队负责人批准
+
+### 运行时开发指导
+
+团队成员在日常开发中应遵循本宪章原则。具体的技术实施细节和最佳实践可在项目文档中查找。
+
+**版本**: 1.0.0 | **批准日期**: 2025-11-06 | **最后修订**: 2025-11-06

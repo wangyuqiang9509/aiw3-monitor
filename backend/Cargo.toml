@@ -1,0 +1,75 @@
+[package]
+name = "aiw3-monitor"
+version = "1.0.0"
+edition = "2021"
+authors = ["AIWS Team"]
+description = "AIWS Blockchain Monitoring and Alerting Platform"
+
+[lib]
+name = "aiw3_monitor"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aiw3_monitor_bin"
+path = "src/main.rs"
+
+[dependencies]
+# 异步运行时
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# HTTP 客户端
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 数据库
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "json"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Prometheus 导出
+prometheus = { version = "0.13", features = ["process"] }
+warp = "0.3"
+
+# 邮件发送
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
+
+# 配置管理
+config = "0.13"
+toml = "0.8"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# 错误处理
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Redis (可选)
+redis = { version = "0.23", features = ["tokio-comp", "connection-manager"], optional = true }
+
+[dev-dependencies]
+# 测试
+mockito = "1.2"
+testcontainers = "0.15"
+tokio-test = "0.4"
+
+# 基准测试
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[features]
+default = []
+redis-support = ["redis"]
+
+[[bench]]
+name = "metrics_collection"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+

@@ -1,0 +1,40 @@
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+specs/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.*
+
+# Build artifacts
+target/debug/
+target/release/
+dist/
+
+# Tests
+tests/
+*.test
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Development
+scripts/
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+

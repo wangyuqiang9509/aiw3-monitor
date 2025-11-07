@@ -1,0 +1,51 @@
+# Rust
+target/
+debug/
+release/
+**/*.rs.bk
+*.pdb
+*.rlib
+*.prof*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+config.toml
+!config.example.toml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+
+# Build artifacts
+dist/
+build/
+
+# Documentation
+target/doc/
+
+# Coverage
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Dependencies
+Cargo.lock
+
+

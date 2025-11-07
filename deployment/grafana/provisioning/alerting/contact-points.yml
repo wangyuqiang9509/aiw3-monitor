@@ -1,0 +1,71 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: Email - Operations Team
+    receivers:
+      - uid: email_ops
+        type: email
+        settings:
+          addresses: ops@example.com
+          singleEmail: true
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: Email - Critical Alerts
+    receivers:
+      - uid: email_critical
+        type: email
+        settings:
+          addresses: critical-alerts@example.com;ops-lead@example.com
+          singleEmail: false
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: Email - Warnings
+    receivers:
+      - uid: email_warnings
+        type: email
+        settings:
+          addresses: warnings@example.com
+          singleEmail: true
+        disableResolveMessage: false
+
+# 告警策略配置
+policies:
+  - orgId: 1
+    receiver: Email - Operations Team
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 10s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      # Critical 级别的告警立即发送到 Critical 邮箱
+      - receiver: Email - Critical Alerts
+        object_matchers:
+          - ['severity', '=', 'critical']
+        group_wait: 0s
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: false
+
+      # Warning 级别的告警发送到 Warnings 邮箱
+      - receiver: Email - Warnings
+        object_matchers:
+          - ['severity', '=', 'warning']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        continue: false
+
+      # Info 级别的告警发送到 Operations Team
+      - receiver: Email - Operations Team
+        object_matchers:
+          - ['severity', '=', 'info']
+        group_wait: 1m
+        group_interval: 10m
+        repeat_interval: 12h
+        continue: false
+

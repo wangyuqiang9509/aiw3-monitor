@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE blockchain_nodes\n            SET enabled = $1, updated_at = NOW()\n            WHERE id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1dc8af7a140d2d6506e8594d5a666db29337052fb68cc17bac22d2a2684252ae"
+}

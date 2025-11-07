@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO metric_data (node_id, metric_type, metric_value, collected_at, metadata)\n                VALUES ($1, $2, $3, $4, $5)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        {
+          "Custom": {
+            "name": "metric_type",
+            "kind": {
+              "Enum": [
+                "blockheight",
+                "blocktime",
+                "nodecount",
+                "txpoolsize",
+                "networklatency",
+                "validatorcount",
+                "tps",
+                "memiavlheight",
+                "blockstmconflicts"
+              ]
+            }
+          }
+        },
+        "Float8",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "83a2e5b2b685e0a2f527d0c1a6a9ff53ecaaa3f1c5948ce263e6835ceb760bf7"
+}
