@@ -1,0 +1,229 @@
+global:
+  # 全局配置
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@aiw3-monitor.com'
+  smtp_auth_username: 'alertmanager@aiw3-monitor.com'
+  smtp_auth_password: 'your-password-here'
+  smtp_require_tls: true
+
+# 告警路由配置
+route:
+  # 默认接收者
+  receiver: 'default-receiver'
+  
+  # 分组配置
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # 分组等待时间（等待更多告警一起发送）
+  group_wait: 30s
+  
+  # 分组间隔时间（同一组告警的发送间隔）
+  group_interval: 5m
+  
+  # 重复告警间隔时间
+  repeat_interval: 4h
+  
+  # 子路由配置
+  routes:
+    # Critical 级别告警 - 立即发送
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true
+    
+    # Warning 级别告警 - 正常发送
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 2h
+      continue: true
+    
+    # Info 级别告警 - 延迟发送，聚合更多
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 12h
+    
+    # 资源告警路由
+    - match:
+        category: resource
+      receiver: 'resource-alerts'
+      group_by: ['alertname', 'node', 'container']
+      continue: true
+    
+    # 性能告警路由
+    - match:
+        category: performance
+      receiver: 'performance-alerts'
+      group_by: ['alertname', 'node']
+      continue: true
+    
+    # 共识告警路由
+    - match:
+        category: consensus
+      receiver: 'consensus-alerts'
+      group_by: ['alertname', 'node']
+      continue: true
+    
+    # 网络告警路由
+    - match:
+        category: network
+      receiver: 'network-alerts'
+      group_by: ['alertname', 'node']
+      continue: true
+    
+    # Mempool 告警路由
+    - match:
+        category: mempool
+      receiver: 'mempool-alerts'
+      group_by: ['alertname', 'node']
+      continue: true
+
+# 告警抑制规则
+inhibit_rules:
+  # 当 Critical 告警触发时，抑制同名的 Warning 告警
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'node']
+  
+  # 当 Warning 告警触发时，抑制同名的 Info 告警
+  - source_match:
+      severity: 'warning'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'node']
+  
+  # 当网络断开时，抑制其他网络相关告警
+  - source_match:
+      alertname: 'NetworkDisconnected'
+    target_match_re:
+      alertname: '(LowPeerCount|LowInboundPeers|LowOutboundPeers)'
+    equal: ['node']
+  
+  # 当所有验证者离线时，抑制其他验证者告警
+  - source_match:
+      alertname: 'NoOnlineValidators'
+    target_match_re:
+      alertname: '(LowOnlineValidators|ValidatorCountDecrease)'
+    equal: ['node']
+  
+  # 当 Mempool 严重拥堵时，抑制一般拥堵告警
+  - source_match:
+      alertname: 'CriticalMempoolCongestion'
+    target_match:
+      alertname: 'HighUnconfirmedTransactions'
+    equal: ['node']
+
+# 接收者配置
+receivers:
+  # 默认接收者
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops-team@example.com'
+        headers:
+          Subject: '[AIW3 Monitor] {{ .GroupLabels.alertname }}'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; }
+              .alert { padding: 10px; margin: 10px 0; border-radius: 5px; }
+              .critical { background-color: #f8d7da; border-left: 4px solid #dc3545; }
+              .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; }
+              .info { background-color: #d1ecf1; border-left: 4px solid #17a2b8; }
+            </style>
+          </head>
+          <body>
+            <h2>AIW3 监控告警</h2>
+            {{ range .Alerts }}
+            <div class="alert {{ .Labels.severity }}">
+              <h3>{{ .Labels.alertname }}</h3>
+              <p><strong>节点:</strong> {{ .Labels.node }}</p>
+              <p><strong>严重级别:</strong> {{ .Labels.severity }}</p>
+              <p><strong>描述:</strong> {{ .Annotations.description }}</p>
+              <p><strong>时间:</strong> {{ .StartsAt }}</p>
+            </div>
+            {{ end }}
+          </body>
+          </html>
+  
+  # Critical 告警接收者
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'critical-alerts@example.com,oncall@example.com'
+        headers:
+          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
+        send_resolved: true
+    # 可以添加其他通知方式
+    # webhook_configs:
+    #   - url: 'http://your-webhook-service/critical'
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+    #     channel: '#critical-alerts'
+  
+  # Warning 告警接收者
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'warning-alerts@example.com'
+        headers:
+          Subject: '⚠️ [WARNING] {{ .GroupLabels.alertname }}'
+        send_resolved: true
+  
+  # Info 告警接收者
+  - name: 'info-alerts'
+    email_configs:
+      - to: 'info-alerts@example.com'
+        headers:
+          Subject: 'ℹ️ [INFO] {{ .GroupLabels.alertname }}'
+        send_resolved: false
+  
+  # 资源告警接收者
+  - name: 'resource-alerts'
+    email_configs:
+      - to: 'resource-team@example.com'
+        headers:
+          Subject: '[Resource] {{ .GroupLabels.alertname }}'
+  
+  # 性能告警接收者
+  - name: 'performance-alerts'
+    email_configs:
+      - to: 'performance-team@example.com'
+        headers:
+          Subject: '[Performance] {{ .GroupLabels.alertname }}'
+  
+  # 共识告警接收者
+  - name: 'consensus-alerts'
+    email_configs:
+      - to: 'consensus-team@example.com'
+        headers:
+          Subject: '[Consensus] {{ .GroupLabels.alertname }}'
+  
+  # 网络告警接收者
+  - name: 'network-alerts'
+    email_configs:
+      - to: 'network-team@example.com'
+        headers:
+          Subject: '[Network] {{ .GroupLabels.alertname }}'
+  
+  # Mempool 告警接收者
+  - name: 'mempool-alerts'
+    email_configs:
+      - to: 'mempool-team@example.com'
+        headers:
+          Subject: '[Mempool] {{ .GroupLabels.alertname }}'
+
+# 静默期配置（通过 amtool 或 API 动态配置）
+# 示例：
+# amtool silence add alertname=LowTPS node=validator1 --duration=2h --comment="Maintenance window"
+

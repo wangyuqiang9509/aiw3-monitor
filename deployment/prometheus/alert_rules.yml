@@ -1,0 +1,156 @@
+groups:
+  - name: aiw3_resource_alerts
+    interval: 30s
+    rules:
+      # CPU 告警规则
+      - alert: HighContainerCPU
+        expr: container_cpu_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "容器 CPU 使用率过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) CPU 使用率为 {{ $value | humanizePercentage }}, 超过 80% 阈值已持续 5 分钟"
+
+      - alert: CriticalContainerCPU
+        expr: container_cpu_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "容器 CPU 使用率严重过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) CPU 使用率为 {{ $value | humanizePercentage }}, 超过 95% 阈值已持续 2 分钟，可能影响性能"
+
+      # 内存告警规则
+      - alert: HighContainerMemory
+        expr: container_memory_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "容器内存使用率过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 内存使用率为 {{ $value | humanizePercentage }}, 超过 80% 阈值已持续 5 分钟"
+
+      - alert: CriticalContainerMemory
+        expr: container_memory_percent > 90
+        for: 2m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "容器内存使用率严重过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 内存使用率为 {{ $value | humanizePercentage }}, 超过 90% 阈值已持续 2 分钟，可能导致 OOM"
+
+      - alert: ContainerMemoryNearLimit
+        expr: (container_memory_bytes / container_memory_limit_bytes) > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "容器内存接近限制"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 内存使用量 ({{ $value | humanize1024 }}B) 接近限制，使用率超过 95%"
+
+      # 网络流量告警
+      - alert: HighNetworkTraffic
+        expr: rate(container_network_rx_bytes[5m]) > 100000000 or rate(container_network_tx_bytes[5m]) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "容器网络流量过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 网络流量超过 100 MB/s 已持续 5 分钟"
+
+      - alert: NetworkTrafficSpike
+        expr: |
+          (
+            rate(container_network_rx_bytes[1m]) 
+            / 
+            rate(container_network_rx_bytes[5m]) 
+          ) > 2
+        for: 2m
+        labels:
+          severity: info
+          category: resources
+        annotations:
+          summary: "容器网络流量激增"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 网络接收流量在过去 1 分钟内激增，是 5 分钟平均值的 2 倍以上"
+
+      # 磁盘 I/O 告警
+      - alert: HighDiskIO
+        expr: rate(container_block_read_bytes[5m]) > 50000000 or rate(container_block_write_bytes[5m]) > 50000000
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "容器磁盘 I/O 过高"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 磁盘 I/O 超过 50 MB/s 已持续 5 分钟"
+
+      - alert: DiskIOSpike
+        expr: |
+          (
+            rate(container_block_write_bytes[1m]) 
+            / 
+            rate(container_block_write_bytes[5m]) 
+          ) > 3
+        for: 2m
+        labels:
+          severity: info
+          category: resources
+        annotations:
+          summary: "容器磁盘写入激增"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 磁盘写入速率在过去 1 分钟内激增，是 5 分钟平均值的 3 倍以上"
+
+      # 容器健康检查
+      - alert: ContainerDown
+        expr: up{job="aiw3-monitor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "监控目标不可达"
+          description: "监控目标 {{ $labels.instance }} 已经 1 分钟无法访问"
+
+      # 资源组合告警（CPU + 内存同时高）
+      - alert: ContainerResourceExhaustion
+        expr: container_cpu_percent > 80 and container_memory_percent > 80
+        for: 3m
+        labels:
+          severity: critical
+          category: resources
+        annotations:
+          summary: "容器资源耗尽"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) CPU 和内存使用率同时超过 80% 已持续 3 分钟，系统可能过载"
+
+  - name: aiw3_resource_trends
+    interval: 1m
+    rules:
+      # 趋势预测告警
+      - alert: CPUUsageIncreasing
+        expr: |
+          predict_linear(container_cpu_percent[30m], 3600) > 90
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "CPU 使用率持续上升"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) CPU 使用率持续上升，预计 1 小时后将超过 90%"
+
+      - alert: MemoryUsageIncreasing
+        expr: |
+          predict_linear(container_memory_percent[30m], 3600) > 90
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "内存使用率持续上升"
+          description: "容器 {{ $labels.container }} (节点: {{ $labels.node }}) 内存使用率持续上升，预计 1 小时后将超过 90%"
+

@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
 use crate::models::alert_rule::{AlertRule, ComparisonOperator, ConditionType};
 use crate::models::metric::MetricData;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use tracing::{debug, info};
 
 /// 告警条件评估器
@@ -12,6 +12,7 @@ pub struct AlertEvaluator;
 pub struct EvaluationResult {
     pub triggered: bool,
     pub current_value: f64,
+    #[allow(dead_code)]
     pub threshold_value: Option<f64>,
     pub message: String,
 }
@@ -62,26 +63,22 @@ impl AlertEvaluator {
             .threshold_value
             .ok_or_else(|| AppError::validation("Threshold value not set"))?;
 
-        let operator_str = rule
-            .comparison_operator
-            .as_ref()
-            .ok_or_else(|| AppError::validation("Comparison operator not set"))?;
-
-        let operator = ComparisonOperator::from_str(operator_str)
-            .ok_or_else(|| AppError::validation(format!("Invalid operator: {}", operator_str)))?;
+        // 使用默认的比较运算符（大于）
+        // 因为 comparison_operator 字段已被删除
+        let operator = ComparisonOperator::GreaterThan;
 
         let triggered = operator.evaluate(current_value, threshold);
 
         let message = if triggered {
             format!(
                 "{} {} {} (current: {})",
-                rule.metric_name,
+                rule.metric_type,
                 operator.as_str(),
                 threshold,
                 current_value
             )
         } else {
-            format!("Condition not met: {} = {}", rule.metric_name, current_value)
+            format!("Condition not met: {} = {}", rule.metric_type, current_value)
         };
 
         info!(
@@ -111,9 +108,7 @@ impl AlertEvaluator {
             });
         }
 
-        let window_seconds = rule
-            .window_seconds
-            .ok_or_else(|| AppError::validation("Time window not set"))?;
+        let window_seconds = rule.time_window_seconds; // 直接使用，不是 Option
 
         let now = Utc::now();
         let window_start = now - chrono::Duration::seconds(window_seconds as i64);
@@ -142,12 +137,12 @@ impl AlertEvaluator {
         let message = if triggered {
             format!(
                 "{} unchanged for {} seconds (value: {})",
-                rule.metric_name, window_seconds, last_value
+                rule.metric_type, window_seconds, last_value
             )
         } else {
             format!(
                 "{} changed from {} to {} in {} seconds",
-                rule.metric_name, first_value, last_value, window_seconds
+                rule.metric_type, first_value, last_value, window_seconds
             )
         };
 
@@ -178,14 +173,11 @@ impl AlertEvaluator {
             });
         }
 
-        let window_seconds = rule
-            .window_seconds
-            .ok_or_else(|| AppError::validation("Time window not set"))?;
-
         let threshold = rule
             .threshold_value
             .ok_or_else(|| AppError::validation("Threshold value not set"))?;
 
+        let window_seconds = rule.time_window_seconds; // 直接使用，不是 Option
         let now = Utc::now();
         let window_start = now - chrono::Duration::seconds(window_seconds as i64);
 
@@ -214,25 +206,21 @@ impl AlertEvaluator {
             0.0
         };
 
-        let operator_str = rule
-            .comparison_operator
-            .as_ref()
-            .ok_or_else(|| AppError::validation("Comparison operator not set"))?;
-
-        let operator = ComparisonOperator::from_str(operator_str)
-            .ok_or_else(|| AppError::validation(format!("Invalid operator: {}", operator_str)))?;
+        // 使用默认的比较运算符（大于）
+        // 因为 comparison_operator 字段已被删除
+        let operator = ComparisonOperator::GreaterThan;
 
         let triggered = operator.evaluate(rate_of_change.abs(), threshold);
 
         let message = if triggered {
             format!(
                 "{} changed by {:.2}% in {} seconds (from {} to {})",
-                rule.metric_name, rate_of_change, window_seconds, first_value, last_value
+                rule.metric_type, rate_of_change, window_seconds, first_value, last_value
             )
         } else {
             format!(
                 "{} change rate {:.2}% is within threshold {}%",
-                rule.metric_name, rate_of_change, threshold
+                rule.metric_type, rate_of_change, threshold
             )
         };
 
@@ -255,6 +243,7 @@ mod tests {
     use super::*;
     use crate::models::alert_rule::Severity;
     use crate::models::metric::MetricType;
+    use chrono::DateTime;
 
     fn create_test_metrics(values: Vec<f64>, timestamps: Vec<DateTime<Utc>>) -> Vec<MetricData> {
         values
@@ -281,16 +270,16 @@ mod tests {
             Severity::Critical,
             vec!["ops@example.com".to_string()],
         )
-        .with_threshold(ComparisonOperator::LessThan, 100000.0);
+        .with_threshold(100000.0);
 
         let metrics = create_test_metrics(
-            vec![99000.0],
+            vec![150000.0],
             vec![Utc::now()],
         );
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
         assert!(result.triggered);
-        assert_eq!(result.current_value, 99000.0);
+        assert_eq!(result.current_value, 150000.0);
         assert_eq!(result.threshold_value, Some(100000.0));
     }
 
@@ -304,16 +293,16 @@ mod tests {
             Severity::Critical,
             vec!["ops@example.com".to_string()],
         )
-        .with_threshold(ComparisonOperator::LessThan, 100000.0);
+        .with_threshold(100000.0);
 
         let metrics = create_test_metrics(
-            vec![101000.0],
+            vec![50000.0],
             vec![Utc::now()],
         );
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
         assert!(!result.triggered);
-        assert_eq!(result.current_value, 101000.0);
+        assert_eq!(result.current_value, 50000.0);
     }
 
     #[test]
@@ -381,7 +370,7 @@ mod tests {
             Severity::Warning,
             vec!["ops@example.com".to_string()],
         )
-        .with_threshold(ComparisonOperator::GreaterThan, 10.0) // 变化率 > 10%
+        .with_threshold(10.0) // 变化率 > 10%
         .with_time_window(600); // 10 分钟窗口
 
         // 创建变化率 > 10% 的指标（从100000降到80000，变化20%）
@@ -408,7 +397,7 @@ mod tests {
             Severity::Critical,
             vec!["ops@example.com".to_string()],
         )
-        .with_threshold(ComparisonOperator::LessThan, 100000.0);
+        .with_threshold(100000.0);
 
         let metrics = vec![];
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();

@@ -1,8 +1,13 @@
 // 指标采集协调器
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+use crate::collectors::docker::{DockerLogsCollector, DockerStatsCollector};
 use crate::collectors::rpc_client::RpcClient;
+use crate::collectors::TpsCalculator;
 use crate::error::Result;
 use crate::exporter::metrics_registry::MetricsRegistry;
 use crate::models::metric::{MetricData, MetricType};
@@ -15,6 +20,9 @@ pub struct MetricsCollector {
     node_store: NodeStore,
     metrics_store: MetricsStore,
     metrics_registry: MetricsRegistry,
+    docker_collectors: HashMap<String, DockerStatsCollector>,
+    docker_log_collectors: HashMap<String, DockerLogsCollector>,
+    tps_calculators: Arc<RwLock<HashMap<String, TpsCalculator>>>,
 }
 
 impl MetricsCollector {
@@ -24,7 +32,36 @@ impl MetricsCollector {
             node_store: NodeStore::new(pool.clone()),
             metrics_store: MetricsStore::new(pool),
             metrics_registry,
+            docker_collectors: HashMap::new(),
+            docker_log_collectors: HashMap::new(),
+            tps_calculators: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    /// 注册 Docker 容器监控（资源指标）
+    pub fn register_docker_container(&mut self, node_name: String, container_name: String) {
+        info!("Registering Docker container for stats: {} (node: {})", container_name, node_name);
+        let collector = DockerStatsCollector::new(container_name);
+        self.docker_collectors.insert(node_name, collector);
+    }
+
+    /// 注册 Docker 容器日志监控（优化特性）
+    pub fn register_docker_logs(&mut self, node_name: String, container_name: String) {
+        info!("Registering Docker container for logs: {} (node: {})", container_name, node_name);
+        let collector = DockerLogsCollector::new(container_name);
+        self.docker_log_collectors.insert(node_name, collector);
+    }
+
+    /// 注册 TPS 计算器（默认 60 秒窗口）
+    pub fn register_tps_calculator(&mut self, node_name: String) {
+        self.register_tps_calculator_with_window(node_name, 60);
+    }
+
+    /// 注册 TPS 计算器（自定义窗口大小）
+    pub async fn register_tps_calculator_with_window(&self, node_name: String, window_size: u64) {
+        info!("Registering TPS calculator for node: {} (window: {}s)", node_name, window_size);
+        let calculator = TpsCalculator::new(window_size);
+        self.tps_calculators.write().await.insert(node_name, calculator);
     }
 
     /// 采集所有启用节点的指标
@@ -141,6 +178,55 @@ impl MetricsCollector {
                     "Failed to get unconfirmed_txs from {}: {}",
                     node.name, e
                 );
+            }
+        }
+
+        // 采集 Docker 资源指标
+        if let Some(docker_collector) = self.docker_collectors.get(&node.name) {
+            match docker_collector.collect().await {
+                Ok(resource_metrics) => {
+                    debug!(
+                        "Collected Docker stats for {}: CPU={:.2}%, Memory={:.2}%",
+                        node.name, resource_metrics.cpu_percent, resource_metrics.memory_percent
+                    );
+
+                    // 更新 Prometheus 指标
+                    self.metrics_registry.set_resource_metrics(
+                        &resource_metrics,
+                        &node.name,
+                        &node.environment,
+                    );
+
+                    // TODO: 将资源指标存储到数据库
+                    // 可以扩展 MetricType 枚举来支持资源指标类型
+                }
+                Err(e) => {
+                    warn!("Failed to collect Docker stats for {}: {}", node.name, e);
+                }
+            }
+        }
+
+        // 采集 Docker 日志（优化特性）
+        if let Some(log_collector) = self.docker_log_collectors.get(&node.name) {
+            match log_collector.collect().await {
+                Ok(optimization_metrics) => {
+                    debug!(
+                        "Collected optimization metrics for {}: Block-STM={}, MemIAVL={}",
+                        node.name, optimization_metrics.block_stm_enabled, optimization_metrics.memiavl_enabled
+                    );
+
+                    // 更新 Prometheus 指标
+                    self.metrics_registry.set_optimization_metrics(
+                        &optimization_metrics,
+                        &node.name,
+                        &node.environment,
+                    );
+
+                    // TODO: 将优化特性指标存储到数据库
+                }
+                Err(e) => {
+                    warn!("Failed to collect Docker logs for {}: {}", node.name, e);
+                }
             }
         }
 

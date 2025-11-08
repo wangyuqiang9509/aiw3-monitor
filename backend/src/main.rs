@@ -57,9 +57,36 @@ async fn main() -> Result<()> {
     });
     info!("Started metrics collection scheduler (interval: {}s)", settings.collection.interval_seconds);
 
+    // 初始化存储层
+    let alert_store = Arc::new(storage::alert_store::AlertStore::new(db_pool.clone()));
+    let metrics_store = Arc::new(storage::metrics_store::MetricsStore::new(db_pool.clone()));
+    let node_store = Arc::new(storage::node_store::NodeStore::new(db_pool.clone()));
+    
+    // 初始化邮件通知器
+    let smtp_config = models::smtp_config::SmtpConfig {
+        id: 0,
+        name: "Default".to_string(),
+        server: settings.smtp.server.clone(),
+        port: settings.smtp.port as i32,
+        username: settings.smtp.username.clone(),
+        password: settings.smtp.password.clone(),
+        from_address: settings.smtp.from.clone(),
+        use_tls: settings.smtp.use_tls,
+        is_default: true,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+    let notifier = Arc::new(alerting::notifier::RetryableEmailNotifier::new(
+        smtp_config,
+        settings.alerting.max_retries,
+    )?);
+    
     // 初始化告警引擎
     let alert_engine = Arc::new(alerting::rule_engine::AlertRuleEngine::new(
-        Arc::new(db_pool.clone()),
+        alert_store,
+        metrics_store,
+        node_store,
+        notifier,
     ));
     info!("Alert engine initialized");
 

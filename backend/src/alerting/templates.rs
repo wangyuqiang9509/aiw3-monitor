@@ -40,7 +40,7 @@ impl EmailTemplates {
             rule.severity.to_uppercase(),
             node_name,
             alert.triggered_at.format("%Y-%m-%d %H:%M:%S UTC"),
-            alert.trigger_value,
+            alert.metric_value.unwrap_or(0.0),
             rule.description.as_deref().unwrap_or("无描述")
         )
     }
@@ -163,7 +163,7 @@ impl EmailTemplates {
             severity = rule.severity.to_uppercase(),
             node_name = node_name,
             triggered_at = alert.triggered_at.format("%Y-%m-%d %H:%M:%S UTC"),
-            trigger_value = alert.trigger_value,
+            trigger_value = alert.metric_value.unwrap_or(0.0),
             description = rule.description.as_deref().unwrap_or("无描述")
         )
     }
@@ -315,7 +315,15 @@ mod tests {
     use chrono::Utc;
 
     fn create_test_alert() -> AlertEvent {
-        AlertEvent::new(1, 1, 99000.0)
+        AlertEvent::new(
+            1,                                  // rule_id
+            Some(1),                           // node_id
+            "critical".to_string(),            // severity
+            "Block height too low".to_string(), // title
+            "Block height is below threshold".to_string(), // message
+            Some(99000.0),                     // metric_value
+            Some(100000.0),                    // threshold_value
+        )
     }
 
     fn create_test_rule() -> AlertRule {
@@ -390,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_severity_colors() {
-        let mut alert = create_test_alert();
+        let alert = create_test_alert();
         let node = create_test_node();
 
         // Test critical

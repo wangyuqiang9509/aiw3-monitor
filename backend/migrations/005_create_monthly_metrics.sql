@@ -1,5 +1,11 @@
 -- 创建月级聚合视图(保留1年)
-CREATE MATERIALIZED VIEW IF NOT EXISTS monthly_metrics
+-- 注意: TimescaleDB 连续聚合视图的创建和策略添加需要分开执行
+
+-- 步骤1: 删除已存在的视图（如果存在）
+DROP MATERIALIZED VIEW IF EXISTS monthly_metrics CASCADE;
+
+-- 步骤2: 创建连续聚合视图
+CREATE MATERIALIZED VIEW monthly_metrics
 WITH (timescaledb.continuous) AS
 SELECT
     node_id,
@@ -13,19 +19,38 @@ SELECT
 FROM metric_data
 GROUP BY node_id, metric_type, time_bucket('1 month', collected_at);
 
--- 创建持续聚合刷新策略
-SELECT add_continuous_aggregate_policy('monthly_metrics',
-    start_offset => INTERVAL '40 days',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 day',
-    if_not_exists => TRUE);
-
--- 设置数据保留策略: 月级数据保留365天
-SELECT add_retention_policy('monthly_metrics', INTERVAL '365 days', if_not_exists => TRUE);
-
--- 创建索引
+-- 步骤3: 创建索引
 CREATE INDEX IF NOT EXISTS idx_monthly_metrics_node ON monthly_metrics(node_id, time_bucket DESC);
 CREATE INDEX IF NOT EXISTS idx_monthly_metrics_type ON monthly_metrics(metric_type, time_bucket DESC);
+
+-- 步骤4: 添加持续聚合刷新策略
+DO $$
+BEGIN
+    -- 检查策略是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.jobs
+        WHERE proc_name = 'policy_refresh_continuous_aggregate'
+        AND hypertable_name = 'monthly_metrics'
+    ) THEN
+        PERFORM add_continuous_aggregate_policy('monthly_metrics',
+            start_offset => INTERVAL '40 days',
+            end_offset => INTERVAL '1 day',
+            schedule_interval => INTERVAL '1 day');
+    END IF;
+END $$;
+
+-- 步骤5: 设置数据保留策略
+DO $$
+BEGIN
+    -- 检查保留策略是否已存在
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.jobs
+        WHERE proc_name = 'policy_retention'
+        AND config::text LIKE '%monthly_metrics%'
+    ) THEN
+        PERFORM add_retention_policy('monthly_metrics', INTERVAL '365 days');
+    END IF;
+END $$;
 
 -- 添加注释
 COMMENT ON MATERIALIZED VIEW monthly_metrics IS '月级聚合指标数据,保留1年,用于年度趋势分析';

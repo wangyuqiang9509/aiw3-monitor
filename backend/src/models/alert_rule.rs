@@ -7,17 +7,19 @@ use sqlx::FromRow;
 pub struct AlertRule {
     pub id: i32,
     pub name: String,
+    pub description: Option<String>,
     pub node_id: Option<i32>,
-    pub metric_name: String,
+    // ✅ 修改: metric_name -> metric_type (匹配数据库)
+    pub metric_type: String,
     pub condition_type: String,
     pub threshold_value: Option<f64>,
-    pub window_seconds: Option<i32>,
-    pub comparison_operator: Option<String>,
+    // ✅ 修改: window_seconds -> time_window_seconds (匹配数据库)
+    pub time_window_seconds: i32,
     pub severity: String,
-    pub email_recipients: Vec<String>,
-    pub silence_period_seconds: i32,
     pub enabled: bool,
-    pub description: Option<String>,
+    pub silence_period_seconds: i32,
+    // ✅ 修改: email_recipients -> notification_channels (匹配数据库 JSONB)
+    pub notification_channels: sqlx::types::Json<Vec<String>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -134,40 +136,38 @@ impl AlertRule {
     pub fn new(
         name: String,
         node_id: Option<i32>,
-        metric_name: String,
+        metric_type: String,  // ✅ 修改参数名
         condition_type: ConditionType,
         severity: Severity,
-        email_recipients: Vec<String>,
+        notification_channels: Vec<String>,  // ✅ 修改参数名
     ) -> Self {
         Self {
             id: 0,
             name,
+            description: None,
             node_id,
-            metric_name,
+            metric_type,  // ✅ 使用新字段名
             condition_type: condition_type.as_str().to_string(),
             threshold_value: None,
-            window_seconds: None,
-            comparison_operator: None,
+            time_window_seconds: 300,  // ✅ 默认5分钟
             severity: severity.as_str().to_string(),
-            email_recipients,
-            silence_period_seconds: 1800, // 默认30分钟
             enabled: true,
-            description: None,
+            silence_period_seconds: 1800, // 默认30分钟
+            notification_channels: sqlx::types::Json(notification_channels),  // ✅ 使用新字段名
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
     }
 
     /// 设置阈值条件
-    pub fn with_threshold(mut self, operator: ComparisonOperator, value: f64) -> Self {
-        self.comparison_operator = Some(operator.as_str().to_string());
+    pub fn with_threshold(mut self, value: f64) -> Self {
         self.threshold_value = Some(value);
         self
     }
 
     /// 设置时间窗口
-    pub fn with_time_window(mut self, window_seconds: i32) -> Self {
-        self.window_seconds = Some(window_seconds);
+    pub fn with_time_window(mut self, seconds: i32) -> Self {
+        self.time_window_seconds = seconds;  // ✅ 使用新字段名
         self
     }
 
@@ -241,23 +241,25 @@ mod tests {
         let rule = AlertRule::new(
             "Test Rule".to_string(),
             Some(1),
-            "block_height".to_string(),
+            "blockheight".to_string(),  // ✅ 使用 metric_type
             ConditionType::Threshold,
             Severity::Critical,
-            vec!["ops@example.com".to_string()],
+            vec!["email".to_string()],  // ✅ 使用 notification_channels
         )
-        .with_threshold(ComparisonOperator::LessThan, 100000.0)
+        .with_threshold(100000.0)  // ✅ 移除 comparison_operator
+        .with_time_window(600)  // ✅ 使用新方法名
         .with_silence_period(3600)
         .with_description("Test description".to_string());
 
         assert_eq!(rule.name, "Test Rule");
         assert_eq!(rule.node_id, Some(1));
-        assert_eq!(rule.metric_name, "block_height");
+        assert_eq!(rule.metric_type, "blockheight");  // ✅ 使用新字段名
         assert_eq!(rule.condition_type, "threshold");
         assert_eq!(rule.severity, "critical");
         assert_eq!(rule.threshold_value, Some(100000.0));
-        assert_eq!(rule.comparison_operator, Some("<".to_string()));
+        assert_eq!(rule.time_window_seconds, 600);  // ✅ 使用新字段名
         assert_eq!(rule.silence_period_seconds, 3600);
         assert_eq!(rule.description, Some("Test description".to_string()));
+        assert_eq!(rule.notification_channels.0, vec!["email".to_string()]);  // ✅ 使用新字段名
     }
 }

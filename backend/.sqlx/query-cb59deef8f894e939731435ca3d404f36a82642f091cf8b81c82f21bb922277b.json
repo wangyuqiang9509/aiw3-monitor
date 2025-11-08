@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM alert_events\n            WHERE triggered_at < $1 AND status = 'resolved'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cb59deef8f894e939731435ca3d404f36a82642f091cf8b81c82f21bb922277b"
+}

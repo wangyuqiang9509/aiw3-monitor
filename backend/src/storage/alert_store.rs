@@ -23,25 +23,24 @@ impl AlertStore {
         let id = sqlx::query_scalar!(
             r#"
             INSERT INTO alert_rules (
-                name, node_id, metric_name, condition_type, threshold_value,
-                window_seconds, comparison_operator, severity, email_recipients,
-                silence_period_seconds, enabled, description
+                name, description, node_id, metric_type, condition_type,
+                threshold_value, time_window_seconds, severity,
+                enabled, silence_period_seconds, notification_channels
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4::metric_type, $5, $6, $7, $8::alert_severity, $9, $10, $11)
             RETURNING id
             "#,
             rule.name,
+            rule.description,
             rule.node_id,
-            rule.metric_name,
+            rule.metric_type as _,
             rule.condition_type,
             rule.threshold_value,
-            rule.window_seconds,
-            rule.comparison_operator,
-            rule.severity,
-            &rule.email_recipients,
-            rule.silence_period_seconds,
+            rule.time_window_seconds,
+            rule.severity as _,
             rule.enabled,
-            rule.description
+            rule.silence_period_seconds,
+            &rule.notification_channels as _
         )
         .fetch_one(&self.pool)
         .await
@@ -56,9 +55,15 @@ impl AlertStore {
         let rules = sqlx::query_as!(
             AlertRule,
             r#"
-            SELECT id, name, node_id, metric_name, condition_type, threshold_value,
-                   window_seconds, comparison_operator, severity, email_recipients,
-                   silence_period_seconds, enabled, description, created_at, updated_at
+            SELECT id, name, description, node_id,
+                   metric_type::text as "metric_type!",
+                   condition_type,
+                   threshold_value, time_window_seconds,
+                   severity::text as "severity!",
+                   enabled,
+                   silence_period_seconds,
+                   notification_channels as "notification_channels!: sqlx::types::Json<Vec<String>>",
+                   created_at, updated_at
             FROM alert_rules
             WHERE enabled = true
             ORDER BY severity DESC, created_at DESC
@@ -77,9 +82,15 @@ impl AlertStore {
         let rule = sqlx::query_as!(
             AlertRule,
             r#"
-            SELECT id, name, node_id, metric_name, condition_type, threshold_value,
-                   window_seconds, comparison_operator, severity, email_recipients,
-                   silence_period_seconds, enabled, description, created_at, updated_at
+            SELECT id, name, description, node_id,
+                   metric_type::text as "metric_type!",
+                   condition_type,
+                   threshold_value, time_window_seconds,
+                   severity::text as "severity!",
+                   enabled,
+                   silence_period_seconds,
+                   notification_channels as "notification_channels!: sqlx::types::Json<Vec<String>>",
+                   created_at, updated_at
             FROM alert_rules
             WHERE id = $1
             "#,
@@ -97,21 +108,20 @@ impl AlertStore {
         sqlx::query!(
             r#"
             UPDATE alert_rules
-            SET name = $1, node_id = $2, metric_name = $3, condition_type = $4,
-                threshold_value = $5, window_seconds = $6, comparison_operator = $7,
-                severity = $8, email_recipients = $9, silence_period_seconds = $10,
-                enabled = $11, description = $12, updated_at = NOW()
-            WHERE id = $13
+            SET name = $1, node_id = $2, metric_type = $3::metric_type, condition_type = $4,
+                threshold_value = $5, time_window_seconds = $6,
+                severity = $7::alert_severity, notification_channels = $8, silence_period_seconds = $9,
+                enabled = $10, description = $11, updated_at = NOW()
+            WHERE id = $12
             "#,
             rule.name,
             rule.node_id,
-            rule.metric_name,
+            rule.metric_type as _,
             rule.condition_type,
             rule.threshold_value,
-            rule.window_seconds,
-            rule.comparison_operator,
-            rule.severity,
-            &rule.email_recipients,
+            rule.time_window_seconds,
+            rule.severity as _,
+            &rule.notification_channels as _,
             rule.silence_period_seconds,
             rule.enabled,
             rule.description,
@@ -149,27 +159,32 @@ impl AlertStore {
         let id = sqlx::query_scalar!(
             r#"
             INSERT INTO alert_events (
-                rule_id, node_id, triggered_at, trigger_value, status,
-                notification_sent, notification_error, user_notes
+                rule_id, node_id, status, severity, title, message,
+                metric_value, threshold_value, triggered_at,
+                notification_sent, notes, metadata
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3::alert_status, $4::alert_severity, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
             "#,
             event.rule_id,
             event.node_id,
+            event.status as _,
+            event.severity as _,
+            event.title,
+            event.message,
+            event.metric_value,
+            event.threshold_value,
             event.triggered_at,
-            event.trigger_value,
-            event.status,
             event.notification_sent,
-            event.notification_error,
-            event.user_notes
+            event.notes,
+            event.metadata
         )
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::Database)?;
 
         info!(
-            "Created alert event: rule_id={}, node_id={}, id={}",
+            "Created alert event: rule_id={}, node_id={:?}, id={}",
             event.rule_id, event.node_id, id
         );
         Ok(id)
@@ -180,15 +195,18 @@ impl AlertStore {
         sqlx::query!(
             r#"
             UPDATE alert_events
-            SET resolved_at = $1, status = $2, notification_sent = $3,
-                notification_error = $4, user_notes = $5, updated_at = NOW()
-            WHERE id = $6
+            SET resolved_at = $1, status = $2::alert_status, notification_sent = $3,
+                notification_sent_at = $4, silenced_until = $5, notes = $6,
+                metadata = $7
+            WHERE id = $8
             "#,
             event.resolved_at,
-            event.status,
+            event.status as _,
             event.notification_sent,
-            event.notification_error,
-            event.user_notes,
+            event.notification_sent_at,
+            event.silenced_until,
+            event.notes,
+            event.metadata,
             event.id
         )
         .execute(&self.pool)
@@ -204,11 +222,15 @@ impl AlertStore {
         let events = sqlx::query_as!(
             AlertEvent,
             r#"
-            SELECT id, rule_id, node_id, triggered_at, resolved_at, trigger_value,
-                   status, notification_sent, notification_error, user_notes,
-                   created_at, updated_at
+            SELECT id, rule_id, node_id,
+                   status::text as "status!",
+                   severity::text as "severity!",
+                   title, message,
+                   metric_value, threshold_value, triggered_at, resolved_at,
+                   silenced_until, notification_sent, notification_sent_at,
+                   notes, metadata
             FROM alert_events
-            WHERE status = 'active'
+            WHERE status = 'triggered'
             ORDER BY triggered_at DESC
             "#
         )
@@ -225,11 +247,15 @@ impl AlertStore {
         let events = sqlx::query_as!(
             AlertEvent,
             r#"
-            SELECT id, rule_id, node_id, triggered_at, resolved_at, trigger_value,
-                   status, notification_sent, notification_error, user_notes,
-                   created_at, updated_at
+            SELECT id, rule_id, node_id,
+                   status::text as "status!",
+                   severity::text as "severity!",
+                   title, message,
+                   metric_value, threshold_value, triggered_at, resolved_at,
+                   silenced_until, notification_sent, notification_sent_at,
+                   notes, metadata
             FROM alert_events
-            WHERE rule_id = $1 AND status = 'active'
+            WHERE rule_id = $1 AND status = 'triggered'
             ORDER BY triggered_at DESC
             "#,
             rule_id
@@ -255,9 +281,13 @@ impl AlertStore {
         let events = sqlx::query_as!(
             AlertEvent,
             r#"
-            SELECT id, rule_id, node_id, triggered_at, resolved_at, trigger_value,
-                   status, notification_sent, notification_error, user_notes,
-                   created_at, updated_at
+            SELECT id, rule_id, node_id,
+                   status::text as "status!",
+                   severity::text as "severity!",
+                   title, message,
+                   metric_value, threshold_value, triggered_at, resolved_at,
+                   silenced_until, notification_sent, notification_sent_at,
+                   notes, metadata
             FROM alert_events
             WHERE triggered_at >= $1 AND triggered_at <= $2
             ORDER BY triggered_at DESC
@@ -291,7 +321,7 @@ impl AlertStore {
             r#"
             SELECT 
                 COUNT(*) as total_count,
-                COUNT(*) FILTER (WHERE status = 'active') as active_count,
+                COUNT(*) FILTER (WHERE status = 'triggered') as active_count,
                 COUNT(*) FILTER (WHERE status = 'resolved') as resolved_count,
                 COUNT(*) FILTER (WHERE notification_sent = true) as notified_count,
                 COUNT(*) FILTER (WHERE notification_sent = false) as failed_notification_count
@@ -345,10 +375,12 @@ impl AlertStore {
         let mut query = String::from(
             r#"
             SELECT 
-                ae.id, ae.rule_id, ae.node_id, ae.triggered_at, ae.resolved_at,
-                ae.trigger_value, ae.status, ae.notification_sent, ae.notification_error,
-                ae.user_notes, ae.created_at, ae.updated_at,
-                ar.name as rule_name, ar.severity, ar.metric_name,
+                ae.id, ae.rule_id, ae.node_id, ae.status,
+                ae.severity, ae.title, ae.message,
+                ae.metric_value, ae.threshold_value,
+                ae.triggered_at, ae.resolved_at, ae.silenced_until,
+                ae.notification_sent, ae.notification_sent_at, ae.notes,
+                ar.name as rule_name, ar.metric_type::text as metric_type,
                 bn.name as node_name, bn.environment
             FROM alert_events ae
             JOIN alert_rules ar ON ae.rule_id = ar.id
@@ -440,17 +472,17 @@ impl AlertStore {
             AlertTypeDistribution,
             r#"
             SELECT 
-                ar.metric_name,
-                ar.severity,
-                COUNT(*) as count,
-                AVG(ae.trigger_value) as avg_trigger_value,
-                MIN(ae.trigger_value) as min_trigger_value,
-                MAX(ae.trigger_value) as max_trigger_value
+                ar.metric_type::text as "metric_type!",
+                ar.severity::text as "severity!",
+                COUNT(*) as "count!",
+                AVG(ae.metric_value) as avg_metric_value,
+                MIN(ae.metric_value) as min_metric_value,
+                MAX(ae.metric_value) as max_metric_value
             FROM alert_events ae
             JOIN alert_rules ar ON ae.rule_id = ar.id
             WHERE ae.triggered_at >= $1 AND ae.triggered_at <= $2
-            GROUP BY ar.metric_name, ar.severity
-            ORDER BY count DESC
+            GROUP BY ar.metric_type, ar.severity
+            ORDER BY COUNT(*) DESC
             "#,
             start_time,
             end_time
@@ -468,32 +500,41 @@ impl AlertStore {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<AlertResponseStats> {
-        let stats = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct StatsRow {
+            avg_response_time: f64,
+            p95_response_time: f64,
+            p99_response_time: f64,
+            min_response_time: f64,
+            max_response_time: f64,
+        }
+
+        let stats = sqlx::query_as::<_, StatsRow>(
             r#"
             SELECT 
-                AVG(EXTRACT(EPOCH FROM (resolved_at - triggered_at))) as avg_response_time,
-                percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (resolved_at - triggered_at))) as p95_response_time,
-                percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (resolved_at - triggered_at))) as p99_response_time,
-                MIN(EXTRACT(EPOCH FROM (resolved_at - triggered_at))) as min_response_time,
-                MAX(EXTRACT(EPOCH FROM (resolved_at - triggered_at))) as max_response_time
+                COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - triggered_at))), 0.0) as avg_response_time,
+                COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (resolved_at - triggered_at))), 0.0) as p95_response_time,
+                COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (resolved_at - triggered_at))), 0.0) as p99_response_time,
+                COALESCE(MIN(EXTRACT(EPOCH FROM (resolved_at - triggered_at))), 0.0) as min_response_time,
+                COALESCE(MAX(EXTRACT(EPOCH FROM (resolved_at - triggered_at))), 0.0) as max_response_time
             FROM alert_events
             WHERE triggered_at >= $1 AND triggered_at <= $2
               AND resolved_at IS NOT NULL
               AND status = 'resolved'
-            "#,
-            start_time,
-            end_time
+            "#
         )
+        .bind(start_time)
+        .bind(end_time)
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::Database)?;
 
         Ok(AlertResponseStats {
-            avg_response_time_seconds: stats.avg_response_time.unwrap_or(0.0),
-            p95_response_time_seconds: stats.p95_response_time.unwrap_or(0.0),
-            p99_response_time_seconds: stats.p99_response_time.unwrap_or(0.0),
-            min_response_time_seconds: stats.min_response_time.unwrap_or(0.0),
-            max_response_time_seconds: stats.max_response_time.unwrap_or(0.0),
+            avg_response_time_seconds: stats.avg_response_time,
+            p95_response_time_seconds: stats.p95_response_time,
+            p99_response_time_seconds: stats.p99_response_time,
+            min_response_time_seconds: stats.min_response_time,
+            max_response_time_seconds: stats.max_response_time,
         })
     }
 
@@ -502,7 +543,7 @@ impl AlertStore {
         sqlx::query!(
             r#"
             UPDATE alert_events
-            SET user_notes = $1, updated_at = NOW()
+            SET notes = $1
             WHERE id = $2
             "#,
             notes,
@@ -528,16 +569,16 @@ impl AlertStore {
             SELECT 
                 bn.id as node_id,
                 bn.name as node_name,
-                COUNT(*) as total_alerts,
-                COUNT(*) FILTER (WHERE ae.status = 'active') as active_alerts,
-                COUNT(*) FILTER (WHERE ar.severity = 'critical') as critical_alerts,
-                COUNT(*) FILTER (WHERE ar.severity = 'warning') as warning_alerts
+                COUNT(*) as "total_alerts!",
+                COUNT(*) FILTER (WHERE ae.status = 'triggered') as "active_alerts!",
+                COUNT(*) FILTER (WHERE ar.severity = 'critical') as "critical_alerts!",
+                COUNT(*) FILTER (WHERE ar.severity = 'warning') as "warning_alerts!"
             FROM alert_events ae
             JOIN blockchain_nodes bn ON ae.node_id = bn.id
             JOIN alert_rules ar ON ae.rule_id = ar.id
             WHERE ae.triggered_at >= $1 AND ae.triggered_at <= $2
             GROUP BY bn.id, bn.name
-            ORDER BY total_alerts DESC
+            ORDER BY COUNT(*) DESC
             "#,
             start_time,
             end_time
@@ -551,7 +592,7 @@ impl AlertStore {
 }
 
 /// 告警统计信息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct AlertStatistics {
     pub total_count: i64,
     pub active_count: i64,
@@ -579,24 +620,26 @@ pub struct AlertEventWithDetails {
     pub id: i64,
     pub rule_id: i32,
     pub node_id: i32,
+    pub status: String,
+    pub severity: String,
+    pub title: String,
+    pub message: String,
+    pub metric_value: Option<f64>,
+    pub threshold_value: Option<f64>,
     pub triggered_at: DateTime<Utc>,
     pub resolved_at: Option<DateTime<Utc>>,
-    pub trigger_value: f64,
-    pub status: String,
+    pub silenced_until: Option<DateTime<Utc>>,
     pub notification_sent: bool,
-    pub notification_error: Option<String>,
-    pub user_notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub notification_sent_at: Option<DateTime<Utc>>,
+    pub notes: Option<String>,
     pub rule_name: String,
-    pub severity: String,
-    pub metric_name: String,
+    pub metric_type: String,
     pub node_name: String,
     pub environment: String,
 }
 
 /// 告警频率统计
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
 pub struct AlertFrequency {
     pub time_bucket: DateTime<Utc>,
     pub count: i64,
@@ -606,18 +649,18 @@ pub struct AlertFrequency {
 }
 
 /// 告警类型分布
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct AlertTypeDistribution {
-    pub metric_name: String,
+    pub metric_type: String,
     pub severity: String,
     pub count: i64,
-    pub avg_trigger_value: Option<f64>,
-    pub min_trigger_value: Option<f64>,
-    pub max_trigger_value: Option<f64>,
+    pub avg_metric_value: Option<f64>,
+    pub min_metric_value: Option<f64>,
+    pub max_metric_value: Option<f64>,
 }
 
 /// 告警响应时间统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct AlertResponseStats {
     pub avg_response_time_seconds: f64,
     pub p95_response_time_seconds: f64,
@@ -627,7 +670,7 @@ pub struct AlertResponseStats {
 }
 
 /// 节点告警统计
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct NodeAlertStats {
     pub node_id: i32,
     pub node_name: String,

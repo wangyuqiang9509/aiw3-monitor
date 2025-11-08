@@ -1,0 +1,225 @@
+groups:
+  - name: tps_alerts
+    interval: 30s
+    rules:
+      # TPS 过低告警
+      - alert: LowTPS
+        expr: aiw3_chain_tps_current < 10
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "TPS 过低 (节点: {{ $labels.node }})"
+          description: "当前 TPS 为 {{ $value }}，低于阈值 10 TPS，持续 5 分钟"
+          
+      # TPS 严重过低告警
+      - alert: CriticalLowTPS
+        expr: aiw3_chain_tps_current < 5
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+        annotations:
+          summary: "TPS 严重过低 (节点: {{ $labels.node }})"
+          description: "当前 TPS 为 {{ $value }}，低于临界阈值 5 TPS"
+          
+      # TPS 峰值异常
+      - alert: TPSPeakAnomaly
+        expr: aiw3_chain_tps_peak > 1000
+        for: 1m
+        labels:
+          severity: info
+          category: performance
+        annotations:
+          summary: "TPS 峰值异常 (节点: {{ $labels.node }})"
+          description: "峰值 TPS 达到 {{ $value }}，可能存在突发流量"
+
+  - name: mempool_alerts
+    interval: 30s
+    rules:
+      # Mempool 未确认交易过多
+      - alert: HighUnconfirmedTransactions
+        expr: aiw3_mempool_unconfirmed_txs > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: mempool
+        annotations:
+          summary: "未确认交易过多 (节点: {{ $labels.node }})"
+          description: "未确认交易数量为 {{ $value }}，超过阈值 1000"
+          
+      # Mempool 严重拥堵
+      - alert: CriticalMempoolCongestion
+        expr: aiw3_mempool_unconfirmed_txs > 5000
+        for: 2m
+        labels:
+          severity: critical
+          category: mempool
+        annotations:
+          summary: "Mempool 严重拥堵 (节点: {{ $labels.node }})"
+          description: "未确认交易数量为 {{ $value }}，超过临界阈值 5000"
+          
+      # Mempool 大小过大
+      - alert: LargeMempoolSize
+        expr: aiw3_mempool_size_bytes > 10485760  # 10MB
+        for: 5m
+        labels:
+          severity: warning
+          category: mempool
+        annotations:
+          summary: "Mempool 大小过大 (节点: {{ $labels.node }})"
+          description: "Mempool 大小为 {{ $value | humanize }}B，超过 10MB"
+          
+      # Mempool 持续增长
+      - alert: MempoolGrowth
+        expr: rate(aiw3_mempool_unconfirmed_txs[5m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: mempool
+        annotations:
+          summary: "Mempool 持续增长 (节点: {{ $labels.node }})"
+          description: "Mempool 交易数量持续增长，增长率: {{ $value | humanize }}/秒"
+
+  - name: validator_alerts
+    interval: 60s
+    rules:
+      # 在线验证者数量过低
+      - alert: LowOnlineValidators
+        expr: (aiw3_validator_online / aiw3_validator_total) < 0.67
+        for: 5m
+        labels:
+          severity: critical
+          category: consensus
+        annotations:
+          summary: "在线验证者数量过低 (节点: {{ $labels.node }})"
+          description: "在线验证者比例为 {{ $value | humanizePercentage }}，低于 2/3 阈值"
+          
+      # 验证者数量减少
+      - alert: ValidatorCountDecrease
+        expr: delta(aiw3_validator_total[10m]) < -2
+        for: 5m
+        labels:
+          severity: warning
+          category: consensus
+        annotations:
+          summary: "验证者数量减少 (节点: {{ $labels.node }})"
+          description: "验证者数量在 10 分钟内减少了 {{ $value | humanize }} 个"
+          
+      # 投票权分布不均
+      - alert: VotingPowerImbalance
+        expr: aiw3_validator_average_voting_power / aiw3_validator_total_voting_power > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          category: consensus
+        annotations:
+          summary: "投票权分布不均 (节点: {{ $labels.node }})"
+          description: "平均投票权占总投票权的 {{ $value | humanizePercentage }}，可能存在中心化风险"
+          
+      # 验证者完全离线
+      - alert: NoOnlineValidators
+        expr: aiw3_validator_online == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: consensus
+        annotations:
+          summary: "所有验证者离线 (节点: {{ $labels.node }})"
+          description: "当前没有在线的验证者，共识可能停止"
+
+  - name: network_alerts
+    interval: 30s
+    rules:
+      # 网络连接过少
+      - alert: LowPeerCount
+        expr: aiw3_network_total_peers < 5
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "网络连接过少 (节点: {{ $labels.node }})"
+          description: "当前连接数为 {{ $value }}，低于阈值 5"
+          
+      # 网络完全断开
+      - alert: NetworkDisconnected
+        expr: aiw3_network_total_peers == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: network
+        annotations:
+          summary: "网络完全断开 (节点: {{ $labels.node }})"
+          description: "节点没有任何对等连接，已与网络断开"
+          
+      # 入站连接过少
+      - alert: LowInboundPeers
+        expr: aiw3_network_inbound_peers < 2
+        for: 10m
+        labels:
+          severity: info
+          category: network
+        annotations:
+          summary: "入站连接过少 (节点: {{ $labels.node }})"
+          description: "入站连接数为 {{ $value }}，可能影响网络健康度"
+          
+      # 出站连接过少
+      - alert: LowOutboundPeers
+        expr: aiw3_network_outbound_peers < 2
+        for: 10m
+        labels:
+          severity: info
+          category: network
+        annotations:
+          summary: "出站连接过少 (节点: {{ $labels.node }})"
+          description: "出站连接数为 {{ $value }}，可能影响数据同步"
+          
+      # 网络连接不平衡
+      - alert: PeerConnectionImbalance
+        expr: abs(aiw3_network_inbound_peers - aiw3_network_outbound_peers) > 10
+        for: 15m
+        labels:
+          severity: info
+          category: network
+        annotations:
+          summary: "网络连接不平衡 (节点: {{ $labels.node }})"
+          description: "入站连接 ({{ $labels.inbound }}) 和出站连接 ({{ $labels.outbound }}) 差异过大"
+          
+      # 监听地址丢失
+      - alert: NoListeningAddresses
+        expr: aiw3_network_listening_addresses == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: network
+        annotations:
+          summary: "监听地址丢失 (节点: {{ $labels.node }})"
+          description: "节点没有监听任何地址，无法接受入站连接"
+
+  - name: performance_alerts
+    interval: 30s
+    rules:
+      # TPS 和 Mempool 综合告警
+      - alert: PerformanceDegradation
+        expr: (aiw3_chain_tps_current < 20) and (aiw3_mempool_unconfirmed_txs > 500)
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "性能下降 (节点: {{ $labels.node }})"
+          description: "TPS 低 ({{ $value }}) 且 Mempool 积压 ({{ $labels.mempool_txs }} 笔)，系统性能下降"
+          
+      # 网络和共识综合告警
+      - alert: ConsensusRisk
+        expr: (aiw3_network_total_peers < 10) and (aiw3_validator_online / aiw3_validator_total < 0.8)
+        for: 5m
+        labels:
+          severity: critical
+          category: consensus
+        annotations:
+          summary: "共识风险 (节点: {{ $labels.node }})"
+          description: "网络连接少且在线验证者比例低，存在共识风险"
+

@@ -51,15 +51,15 @@ impl ReportExporter {
                 escape_csv(&event.rule_name),
                 escape_csv(&event.node_name),
                 escape_csv(&event.environment),
-                escape_csv(&event.metric_name),
+                escape_csv(&event.metric_type),
                 escape_csv(&event.severity),
                 escape_csv(&event.status),
-                event.trigger_value,
+                event.metric_value.unwrap_or(0.0),
                 event.triggered_at.to_rfc3339(),
                 event.resolved_at.map(|t| t.to_rfc3339()).unwrap_or_default(),
                 duration.map(|d| d.to_string()).unwrap_or_default(),
                 event.notification_sent,
-                escape_csv(&event.user_notes.clone().unwrap_or_default())
+                escape_csv(&event.notes.clone().unwrap_or_default())
             )?;
         }
 
@@ -157,16 +157,15 @@ pub struct AlertEventExport {
     pub rule_name: String,
     pub node_name: String,
     pub environment: String,
-    pub metric_name: String,
+    pub metric_type: String,
     pub severity: String,
     pub status: String,
-    pub trigger_value: f64,
+    pub metric_value: Option<f64>,
     pub triggered_at: String,
     pub resolved_at: Option<String>,
     pub duration_seconds: Option<i64>,
     pub notification_sent: bool,
-    pub notification_error: Option<String>,
-    pub user_notes: Option<String>,
+    pub notes: Option<String>,
 }
 
 impl AlertEventExport {
@@ -180,16 +179,15 @@ impl AlertEventExport {
             rule_name: event.rule_name.clone(),
             node_name: event.node_name.clone(),
             environment: event.environment.clone(),
-            metric_name: event.metric_name.clone(),
+            metric_type: event.metric_type.clone(),
             severity: event.severity.clone(),
             status: event.status.clone(),
-            trigger_value: event.trigger_value,
+            metric_value: event.metric_value,
             triggered_at: event.triggered_at.to_rfc3339(),
             resolved_at: event.resolved_at.map(|t| t.to_rfc3339()),
             duration_seconds,
             notification_sent: event.notification_sent,
-            notification_error: event.notification_error.clone(),
-            user_notes: event.user_notes.clone(),
+            notes: event.notes.clone(),
         }
     }
 }
@@ -260,16 +258,15 @@ mod tests {
             rule_name: "Test Rule".to_string(),
             node_name: "Test Node".to_string(),
             environment: "test".to_string(),
-            metric_name: "test_metric".to_string(),
+            metric_type: "test_metric".to_string(),
             severity: "warning".to_string(),
             status: "active".to_string(),
-            trigger_value: 10.5,
+            metric_value: Some(10.5),
             triggered_at: "2025-11-06T14:30:00Z".to_string(),
             resolved_at: None,
             duration_seconds: None,
             notification_sent: true,
-            notification_error: None,
-            user_notes: Some("Test note".to_string()),
+            notes: Some("Test note".to_string()),
         };
 
         assert_eq!(export.id, 1);

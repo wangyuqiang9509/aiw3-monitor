@@ -152,8 +152,12 @@ impl AlertRuleEngine {
         // 创建告警事件
         let mut event = AlertEvent::new(
             rule.id,
-            rule.node_id.unwrap_or(0),
-            evaluation.current_value,
+            rule.node_id,
+            rule.severity.clone(),
+            format!("Alert: {}", rule.name),
+            evaluation.message.clone(),
+            Some(evaluation.current_value),
+            rule.threshold_value,
         );
 
         // 保存到数据库
@@ -169,7 +173,8 @@ impl AlertRuleEngine {
             }
             Err(e) => {
                 error!("Failed to send alert notification for rule {}: {}", rule.name, e);
-                event.mark_notification_failed(e.to_string());
+                // 不再使用 mark_notification_failed，直接更新状态
+                // notification_sent 已经是 false，只需记录错误
                 self.alert_store.update_event(&event).await?;
             }
         }
@@ -222,12 +227,12 @@ impl AlertRuleEngine {
         use crate::models::metric::MetricType;
         
         // 根据规则的时间窗口获取指标
-        let window_seconds = rule.window_seconds.unwrap_or(300); // 默认5分钟
+        let window_seconds = rule.time_window_seconds; // 直接使用，不是 Option
         let end_time = Utc::now();
         let start_time = end_time - chrono::Duration::seconds(window_seconds as i64);
 
         // 将规则的指标名称转换为 MetricType
-        let metric_type = match rule.metric_name.to_lowercase().as_str() {
+        let metric_type = match rule.metric_type.to_lowercase().as_str() {
             "block_height" => MetricType::BlockHeight,
             "block_time" => MetricType::BlockTime,
             "node_count" | "peer_count" => MetricType::NodeCount,
@@ -238,7 +243,7 @@ impl AlertRuleEngine {
             "mem_iavl_height" => MetricType::MemIavlHeight,
             "block_stm_conflicts" => MetricType::BlockStmConflicts,
             _ => {
-                warn!("Unknown metric name: {}, using BlockHeight as default", rule.metric_name);
+                warn!("Unknown metric name: {}, using BlockHeight as default", rule.metric_type);
                 MetricType::BlockHeight
             }
         };

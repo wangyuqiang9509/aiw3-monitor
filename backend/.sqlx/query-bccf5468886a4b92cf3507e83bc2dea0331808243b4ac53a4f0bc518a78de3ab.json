@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO alert_events (\n                rule_id, node_id, status, severity, title, message,\n                metric_value, threshold_value, triggered_at,\n                notification_sent, notes, metadata\n            )\n            VALUES ($1, $2, $3::alert_status, $4::alert_severity, $5, $6, $7, $8, $9, $10, $11, $12)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        {
+          "Custom": {
+            "name": "alert_status",
+            "kind": {
+              "Enum": [
+                "triggered",
+                "resolved",
+                "silenced"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "alert_severity",
+            "kind": {
+              "Enum": [
+                "critical",
+                "warning",
+                "info"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Text",
+        "Float8",
+        "Float8",
+        "Timestamptz",
+        "Bool",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bccf5468886a4b92cf3507e83bc2dea0331808243b4ac53a4f0bc518a78de3ab"
+}

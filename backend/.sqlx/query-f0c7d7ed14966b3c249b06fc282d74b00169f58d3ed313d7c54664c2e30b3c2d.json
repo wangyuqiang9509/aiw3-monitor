@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, name, description, node_id,\n                   metric_type::text as \"metric_type!\",\n                   condition_type,\n                   threshold_value, time_window_seconds,\n                   severity::text as \"severity!\",\n                   enabled,\n                   silence_period_seconds,\n                   notification_channels as \"notification_channels!: sqlx::types::Json<Vec<String>>\",\n                   created_at, updated_at\n            FROM alert_rules\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "node_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "metric_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "condition_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "threshold_value",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "time_window_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "severity!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 10,
+        "name": "silence_period_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "notification_channels!: sqlx::types::Json<Vec<String>>",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      null,
+      false,
+      true,
+      false,
+      null,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f0c7d7ed14966b3c249b06fc282d74b00169f58d3ed313d7c54664c2e30b3c2d"
+}

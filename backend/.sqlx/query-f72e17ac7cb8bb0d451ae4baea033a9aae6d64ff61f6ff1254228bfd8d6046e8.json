@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                ar.metric_type::text as \"metric_type!\",\n                ar.severity::text as \"severity!\",\n                COUNT(*) as \"count!\",\n                AVG(ae.metric_value) as avg_metric_value,\n                MIN(ae.metric_value) as min_metric_value,\n                MAX(ae.metric_value) as max_metric_value\n            FROM alert_events ae\n            JOIN alert_rules ar ON ae.rule_id = ar.id\n            WHERE ae.triggered_at >= $1 AND ae.triggered_at <= $2\n            GROUP BY ar.metric_type, ar.severity\n            ORDER BY COUNT(*) DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "metric_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "severity!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "avg_metric_value",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "min_metric_value",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "max_metric_value",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f72e17ac7cb8bb0d451ae4baea033a9aae6d64ff61f6ff1254228bfd8d6046e8"
+}

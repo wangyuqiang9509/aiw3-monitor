@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT \n                bn.id as node_id,\n                bn.name as node_name,\n                COUNT(*) as \"total_alerts!\",\n                COUNT(*) FILTER (WHERE ae.status = 'triggered') as \"active_alerts!\",\n                COUNT(*) FILTER (WHERE ar.severity = 'critical') as \"critical_alerts!\",\n                COUNT(*) FILTER (WHERE ar.severity = 'warning') as \"warning_alerts!\"\n            FROM alert_events ae\n            JOIN blockchain_nodes bn ON ae.node_id = bn.id\n            JOIN alert_rules ar ON ae.rule_id = ar.id\n            WHERE ae.triggered_at >= $1 AND ae.triggered_at <= $2\n            GROUP BY bn.id, bn.name\n            ORDER BY COUNT(*) DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "node_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "node_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_alerts!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "active_alerts!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "critical_alerts!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "warning_alerts!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "2285c02305c508cf7d4ad782f8b2a3a1abb27cd95d4924c540df86c831a34f2e"
+}

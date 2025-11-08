@@ -32,7 +32,7 @@ impl EmailNotifier {
         node: Option<&BlockchainNode>,
     ) -> Result<()> {
         info!(
-            "Sending alert notification: rule={}, node_id={}",
+            "Sending alert notification: rule={}, node_id={:?}",
             rule.name, alert.node_id
         );
 
@@ -49,7 +49,7 @@ impl EmailNotifier {
         );
 
         // 发送给所有收件人
-        for recipient in &rule.email_recipients {
+        for recipient in &rule.notification_channels.0 {
             match self
                 .send_email(recipient, &subject, &text_body, &html_body)
                 .await
@@ -75,7 +75,7 @@ impl EmailNotifier {
         node: Option<&BlockchainNode>,
     ) -> Result<()> {
         info!(
-            "Sending resolution notification: rule={}, node_id={}",
+            "Sending resolution notification: rule={}, node_id={:?}",
             rule.name, alert.node_id
         );
 
@@ -91,7 +91,7 @@ impl EmailNotifier {
         );
 
         // 发送给所有收件人
-        for recipient in &rule.email_recipients {
+        for recipient in &rule.notification_channels.0 {
             match self
                 .send_email(recipient, &subject, &text_body, &html_body)
                 .await

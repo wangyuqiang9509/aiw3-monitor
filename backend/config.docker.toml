@@ -1,0 +1,52 @@
+[service]
+name = "aiw3-monitor"
+log_level = "info"
+prometheus_port = 9090
+
+[database]
+host = "postgres"
+port = 5432
+database = "aiw3_monitor"
+username = "postgres"
+password = "secret"
+max_connections = 10
+
+[[nodes]]
+name = "AIWS DevNet 3"
+rpc_url = "https://devnet-rpc3.aiw3.io"
+rest_url = "https://devnet-api3.aiw3.io"
+grpc_url = "https://devnet-grpc3.aiw3.io:443"
+environment = "devnet"
+enabled = true
+labels = { region = "us-west", chain_id = "aiw3chain-devnet" }
+
+[collection]
+interval_seconds = 30
+timeout_seconds = 10
+retry_count = 3
+
+[aggregation]
+hourly_cron = "0 * * * *"
+daily_cron = "0 0 * * *"
+monthly_cron = "0 0 1 * *"
+
+[retention]
+raw_metrics_hours = 1
+hourly_metrics_days = 7
+daily_metrics_days = 90
+monthly_metrics_days = 365
+
+[smtp]
+server = "smtp.gmail.com"
+port = 587
+username = "alerts@example.com"
+password = "your-app-password"
+from = "aiw3-monitor@example.com"
+use_tls = true
+
+[alerting]
+check_interval_seconds = 60
+silence_period_seconds = 1800
+max_retries = 3
+
+

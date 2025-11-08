@@ -48,6 +48,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1.0"
 anyhow = "1.0"
 
+# 正则表达式（用于日志解析）
+regex = "1.10"
+
 # Redis (可选)
 redis = { version = "0.23", features = ["tokio-comp", "connection-manager"], optional = true }
 

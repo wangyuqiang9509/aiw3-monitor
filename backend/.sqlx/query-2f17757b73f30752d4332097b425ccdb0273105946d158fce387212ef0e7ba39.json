@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE alert_events\n            SET resolved_at = $1, status = $2::alert_status, notification_sent = $3,\n                notification_sent_at = $4, silenced_until = $5, notes = $6,\n                metadata = $7\n            WHERE id = $8\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        {
+          "Custom": {
+            "name": "alert_status",
+            "kind": {
+              "Enum": [
+                "triggered",
+                "resolved",
+                "silenced"
+              ]
+            }
+          }
+        },
+        "Bool",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Jsonb",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2f17757b73f30752d4332097b425ccdb0273105946d158fce387212ef0e7ba39"
+}

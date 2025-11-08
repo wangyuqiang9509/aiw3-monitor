@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE alert_rules\n            SET name = $1, node_id = $2, metric_type = $3::metric_type, condition_type = $4,\n                threshold_value = $5, time_window_seconds = $6,\n                severity = $7::alert_severity, notification_channels = $8, silence_period_seconds = $9,\n                enabled = $10, description = $11, updated_at = NOW()\n            WHERE id = $12\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int4",
+        {
+          "Custom": {
+            "name": "metric_type",
+            "kind": {
+              "Enum": [
+                "blockheight",
+                "blocktime",
+                "nodecount",
+                "txpoolsize",
+                "networklatency",
+                "validatorcount",
+                "tps",
+                "memiavlheight",
+                "blockstmconflicts"
+              ]
+            }
+          }
+        },
+        "Varchar",
+        "Float8",
+        "Int4",
+        {
+          "Custom": {
+            "name": "alert_severity",
+            "kind": {
+              "Enum": [
+                "critical",
+                "warning",
+                "info"
+              ]
+            }
+          }
+        },
+        "Jsonb",
+        "Int4",
+        "Bool",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b5c01133da77f82c0a698ced478b6b5964d8b71874768e175e73a0d2d55fef07"
+}

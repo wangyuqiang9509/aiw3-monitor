@@ -1,10 +1,12 @@
 # 构建阶段
-FROM rust:1.75 as builder
+FROM rust:1.80 as builder
 
 WORKDIR /build
 
 # 复制依赖文件
 COPY backend/Cargo.toml backend/Cargo.lock ./
+COPY backend/benches ./benches
+COPY backend/.sqlx ./.sqlx
 
 # 构建依赖(利用Docker缓存)
 RUN mkdir src && \
@@ -14,9 +16,9 @@ RUN mkdir src && \
 
 # 复制源代码
 COPY backend/src ./src
-COPY backend/benches ./benches
 
 # 构建应用
+ENV SQLX_OFFLINE=true
 RUN touch src/main.rs && \
     cargo build --release
 
