@@ -40,9 +40,8 @@ impl ReportExporter {
 
         // 写入数据行
         for event in &events {
-            let duration = event.resolved_at.map(|resolved| {
-                (resolved - event.triggered_at).num_seconds()
-            });
+            let duration =
+                event.resolved_at.map(|resolved| (resolved - event.triggered_at).num_seconds());
 
             writeln!(
                 output,
@@ -82,10 +81,8 @@ impl ReportExporter {
         let events = self.alert_store.query_alert_history(filter).await?;
 
         // 转换为可序列化的格式
-        let export_events: Vec<AlertEventExport> = events
-            .iter()
-            .map(|e| AlertEventExport::from_details(e))
-            .collect();
+        let export_events: Vec<AlertEventExport> =
+            events.iter().map(|e| AlertEventExport::from_details(e)).collect();
 
         // 创建导出报告
         let report = AlertReport {
@@ -113,9 +110,12 @@ impl ReportExporter {
     ) -> Result<()> {
         // 获取各种统计数据
         let basic_stats = self.alert_store.get_alert_statistics(start_time, end_time).await?;
-        let frequency_stats = self.alert_store.get_alert_frequency(start_time, end_time, "day").await?;
-        let type_distribution = self.alert_store.get_alert_type_distribution(start_time, end_time).await?;
-        let response_stats = self.alert_store.get_alert_response_stats(start_time, end_time).await?;
+        let frequency_stats =
+            self.alert_store.get_alert_frequency(start_time, end_time, "day").await?;
+        let type_distribution =
+            self.alert_store.get_alert_type_distribution(start_time, end_time).await?;
+        let response_stats =
+            self.alert_store.get_alert_response_stats(start_time, end_time).await?;
         let node_stats = self.alert_store.get_node_alert_stats(start_time, end_time).await?;
 
         // 创建统计报告
@@ -170,9 +170,8 @@ pub struct AlertEventExport {
 
 impl AlertEventExport {
     fn from_details(event: &AlertEventWithDetails) -> Self {
-        let duration_seconds = event.resolved_at.map(|resolved| {
-            (resolved - event.triggered_at).num_seconds()
-        });
+        let duration_seconds =
+            event.resolved_at.map(|resolved| (resolved - event.triggered_at).num_seconds());
 
         Self {
             id: event.id,
@@ -273,4 +272,3 @@ mod tests {
         assert_eq!(export.severity, "warning");
     }
 }
-

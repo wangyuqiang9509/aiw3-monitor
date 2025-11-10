@@ -256,9 +256,7 @@ mod tests {
         store.insert_batch(&metrics).await.unwrap();
 
         // 获取最新的指标
-        let result = store
-            .get_latest(1, MetricType::BlockHeight, 10)
-            .await;
+        let result = store.get_latest(1, MetricType::BlockHeight, 10).await;
 
         assert!(result.is_ok());
         let fetched = result.unwrap();
@@ -276,9 +274,7 @@ mod tests {
         let start = now - chrono::Duration::hours(1);
         let end = now;
 
-        let result = store
-            .get_range(1, MetricType::BlockHeight, start, end)
-            .await;
+        let result = store.get_range(1, MetricType::BlockHeight, start, end).await;
 
         assert!(result.is_ok());
         let _metrics = result.unwrap();
@@ -315,13 +311,13 @@ mod tests {
     async fn test_metrics_store_creation() {
         // 测试 MetricsStore 可以被创建(不需要数据库连接)
         use sqlx::postgres::PgPoolOptions;
-        
+
         // 创建一个未连接的 pool (仅用于测试结构)
         let pool = PgPoolOptions::new()
             .max_connections(1)
             .connect_lazy("postgres://localhost/test")
             .unwrap();
-        
+
         let _store = MetricsStore::new(pool);
         // 如果能创建,测试通过
     }

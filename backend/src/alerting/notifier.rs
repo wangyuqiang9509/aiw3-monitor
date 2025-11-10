@@ -20,7 +20,7 @@ impl EmailNotifier {
     pub fn new(smtp_config: SmtpConfig) -> Result<Self> {
         // 验证 SMTP 配置
         smtp_config.validate().map_err(AppError::validation)?;
-        
+
         Ok(Self { smtp_config })
     }
 
@@ -31,10 +31,7 @@ impl EmailNotifier {
         rule: &AlertRule,
         node: Option<&BlockchainNode>,
     ) -> Result<()> {
-        info!(
-            "Sending alert notification: rule={}, node_id={:?}",
-            rule.name, alert.node_id
-        );
+        info!("Sending alert notification: rule={}, node_id={:?}", rule.name, alert.node_id);
 
         // 生成邮件内容
         let text_body = EmailTemplates::generate_text(alert, rule, node);
@@ -50,10 +47,7 @@ impl EmailNotifier {
 
         // 发送给所有收件人
         for recipient in &rule.notification_channels.0 {
-            match self
-                .send_email(recipient, &subject, &text_body, &html_body)
-                .await
-            {
+            match self.send_email(recipient, &subject, &text_body, &html_body).await {
                 Ok(_) => {
                     info!("Alert notification sent to: {}", recipient);
                 }
@@ -74,10 +68,7 @@ impl EmailNotifier {
         rule: &AlertRule,
         node: Option<&BlockchainNode>,
     ) -> Result<()> {
-        info!(
-            "Sending resolution notification: rule={}, node_id={:?}",
-            rule.name, alert.node_id
-        );
+        info!("Sending resolution notification: rule={}, node_id={:?}", rule.name, alert.node_id);
 
         // 生成邮件内容
         let text_body = EmailTemplates::generate_resolution_text(alert, rule, node);
@@ -92,10 +83,7 @@ impl EmailNotifier {
 
         // 发送给所有收件人
         for recipient in &rule.notification_channels.0 {
-            match self
-                .send_email(recipient, &subject, &text_body, &html_body)
-                .await
-            {
+            match self.send_email(recipient, &subject, &text_body, &html_body).await {
                 Ok(_) => {
                     info!("Resolution notification sent to: {}", recipient);
                 }
@@ -164,8 +152,7 @@ AIWS Blockchain Monitor
 </html>
 "#;
 
-        self.send_email(recipient, subject, text_body, html_body)
-            .await
+        self.send_email(recipient, subject, text_body, html_body).await
     }
 
     /// 发送单个邮件
@@ -211,10 +198,8 @@ AIWS Blockchain Monitor
             .map_err(|e| AppError::validation(format!("Failed to build email: {}", e)))?;
 
         // 创建 SMTP 传输
-        let creds = Credentials::new(
-            self.smtp_config.username.clone(),
-            self.smtp_config.password.clone(),
-        );
+        let creds =
+            Credentials::new(self.smtp_config.username.clone(), self.smtp_config.password.clone());
 
         let mailer = if self.smtp_config.use_tls {
             SmtpTransport::relay(&self.smtp_config.server)
@@ -249,10 +234,7 @@ impl RetryableEmailNotifier {
     /// 创建带重试功能的邮件发送器
     pub fn new(smtp_config: SmtpConfig, max_retries: u32) -> Result<Self> {
         let notifier = EmailNotifier::new(smtp_config)?;
-        Ok(Self {
-            notifier,
-            max_retries,
-        })
+        Ok(Self { notifier, max_retries })
     }
 
     /// 发送告警通知（带重试）
@@ -286,7 +268,8 @@ impl RetryableEmailNotifier {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| AppError::validation("Failed to send email after retries")))
+        Err(last_error
+            .unwrap_or_else(|| AppError::validation("Failed to send email after retries")))
     }
 
     /// 发送恢复通知（带重试）
@@ -319,7 +302,8 @@ impl RetryableEmailNotifier {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| AppError::validation("Failed to send email after retries")))
+        Err(last_error
+            .unwrap_or_else(|| AppError::validation("Failed to send email after retries")))
     }
 }
 

@@ -10,7 +10,7 @@ use tracing::{debug, warn};
 use crate::error::Result;
 
 /// 告警静默管理器
-/// 
+///
 /// 负责管理告警的静默期，防止在短时间内重复发送相同的告警通知
 pub struct AlertSilence {
     pool: Arc<PgPool>,
@@ -23,11 +23,11 @@ impl AlertSilence {
     }
 
     /// 检查告警规则是否在静默期内
-    /// 
+    ///
     /// # 参数
     /// - `rule_id`: 告警规则 ID
     /// - `silence_period_seconds`: 静默期时长（秒）
-    /// 
+    ///
     /// # 返回
     /// - `Ok(true)`: 在静默期内，不应发送告警
     /// - `Ok(false)`: 不在静默期内，可以发送告警
@@ -51,7 +51,7 @@ impl AlertSilence {
         if let Some((last_triggered_at,)) = recent_alert {
             let now = Utc::now();
             let elapsed_seconds = (now - last_triggered_at).num_seconds();
-            
+
             if elapsed_seconds < silence_period_seconds as i64 {
                 debug!(
                     rule_id = rule_id,
@@ -67,7 +67,7 @@ impl AlertSilence {
     }
 
     /// 记录告警已发送，开始静默期
-    /// 
+    ///
     /// # 参数
     /// - `event_id`: 告警事件 ID
     pub async fn mark_alert_sent(&self, event_id: i64) -> Result<()> {
@@ -87,7 +87,7 @@ impl AlertSilence {
     }
 
     /// 清理过期的静默记录（可选的维护操作）
-    /// 
+    ///
     /// 将已恢复的告警事件标记为已处理，避免数据库中积累过多活跃告警
     pub async fn cleanup_resolved_alerts(&self) -> Result<u64> {
         let result = sqlx::query(
@@ -113,10 +113,10 @@ impl AlertSilence {
     }
 
     /// 获取规则的活跃告警数量
-    /// 
+    ///
     /// # 参数
     /// - `rule_id`: 告警规则 ID
-    /// 
+    ///
     /// # 返回
     /// 活跃告警的数量
     pub async fn get_active_alert_count(&self, rule_id: i32) -> Result<i64> {
@@ -135,7 +135,7 @@ impl AlertSilence {
     }
 
     /// 恢复告警（当条件不再满足时）
-    /// 
+    ///
     /// # 参数
     /// - `rule_id`: 告警规则 ID
     pub async fn resolve_alerts(&self, rule_id: i32) -> Result<u64> {
@@ -165,7 +165,6 @@ impl AlertSilence {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     // 注意：这些测试需要实际的数据库连接
     // 在 CI 环境中，应使用 testcontainers 或类似工具提供测试数据库
@@ -177,4 +176,3 @@ mod tests {
         // 在集成测试中进行完整测试
     }
 }
-

@@ -4,15 +4,11 @@ use std::process::Command;
 fn main() {
     println!("=== Docker Stats 简单测试 ===\n");
 
-    let containers = vec![
-        "aiw3defi-validator1",
-        "aiw3defi-validator2",
-        "aiw3defi-validator3",
-    ];
+    let containers = vec!["aiw3defi-validator1", "aiw3defi-validator2", "aiw3defi-validator3"];
 
     for container in containers {
         println!("测试容器: {}", container);
-        
+
         let output = Command::new("docker")
             .args(&["stats", "--no-stream", "--format", "json", container])
             .output();
@@ -23,7 +19,7 @@ fn main() {
                     let stdout = String::from_utf8_lossy(&output.stdout);
                     println!("✅ 成功!");
                     println!("输出: {}", stdout);
-                    
+
                     // 尝试解析 JSON
                     match serde_json::from_str::<serde_json::Value>(&stdout) {
                         Ok(json) => {
@@ -45,8 +41,7 @@ fn main() {
                 println!("❌ 执行失败: {}", e);
             }
         }
-        
+
         println!();
     }
 }
-

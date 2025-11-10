@@ -14,18 +14,12 @@ pub struct CollectionScheduler {
 impl CollectionScheduler {
     /// 创建新的调度器
     pub fn new(collector: MetricsCollector, interval_seconds: u64) -> Self {
-        Self {
-            collector,
-            interval_seconds,
-        }
+        Self { collector, interval_seconds }
     }
 
     /// 运行调度器(无限循环)
     pub async fn run(&self) {
-        info!(
-            "Starting collection scheduler with interval: {}s",
-            self.interval_seconds
-        );
+        info!("Starting collection scheduler with interval: {}s", self.interval_seconds);
 
         let mut interval = time::interval(Duration::from_secs(self.interval_seconds));
 
@@ -59,14 +53,13 @@ mod tests {
     #[tokio::test]
     #[ignore] // 需要数据库
     async fn test_run_once() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
+        });
 
         let pool = PgPool::connect(&database_url).await.unwrap();
         let registry = MetricsRegistry::new().unwrap();
-        let collector = MetricsCollector::new(pool, registry);
+        let collector = MetricsCollector::new(pool, registry).unwrap();
         let scheduler = CollectionScheduler::new(collector, 30);
 
         let result = scheduler.run_once().await;

@@ -14,18 +14,12 @@ pub struct AlertScheduler {
 impl AlertScheduler {
     /// 创建新的告警调度器
     pub fn new(engine: Arc<AlertRuleEngine>, check_interval_seconds: u64) -> Self {
-        Self {
-            engine,
-            check_interval: Duration::from_secs(check_interval_seconds),
-        }
+        Self { engine, check_interval: Duration::from_secs(check_interval_seconds) }
     }
 
     /// 启动调度器（持续运行）
     pub async fn start(&self) {
-        info!(
-            "Starting alert scheduler with interval: {:?}",
-            self.check_interval
-        );
+        info!("Starting alert scheduler with interval: {:?}", self.check_interval);
 
         let mut ticker = interval(self.check_interval);
 
@@ -62,7 +56,6 @@ impl AlertScheduler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_alert_scheduler_creation() {
@@ -70,4 +63,3 @@ mod tests {
         // 这里只测试基本的结构
     }
 }
-

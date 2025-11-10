@@ -421,10 +421,7 @@ impl AlertStore {
             .await
             .map_err(AppError::Database)?;
 
-        debug!(
-            "Retrieved {} alert events with filters",
-            events.len()
-        );
+        debug!("Retrieved {} alert events with filters", events.len());
         Ok(events)
     }
 
@@ -705,4 +702,3 @@ mod tests {
         assert_eq!(stats.resolved_count, 90);
     }
 }
-

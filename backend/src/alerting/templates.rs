@@ -192,10 +192,7 @@ impl EmailTemplates {
             rule.name,
             node_name,
             alert.triggered_at.format("%Y-%m-%d %H:%M:%S UTC"),
-            alert
-                .resolved_at
-                .unwrap_or(alert.triggered_at)
-                .format("%Y-%m-%d %H:%M:%S UTC"),
+            alert.resolved_at.unwrap_or(alert.triggered_at).format("%Y-%m-%d %H:%M:%S UTC"),
             duration
         )
     }
@@ -299,10 +296,8 @@ impl EmailTemplates {
             rule_name = rule.name,
             node_name = node_name,
             triggered_at = alert.triggered_at.format("%Y-%m-%d %H:%M:%S UTC"),
-            resolved_at = alert
-                .resolved_at
-                .unwrap_or(alert.triggered_at)
-                .format("%Y-%m-%d %H:%M:%S UTC"),
+            resolved_at =
+                alert.resolved_at.unwrap_or(alert.triggered_at).format("%Y-%m-%d %H:%M:%S UTC"),
             duration = duration
         )
     }
@@ -316,13 +311,13 @@ mod tests {
 
     fn create_test_alert() -> AlertEvent {
         AlertEvent::new(
-            1,                                  // rule_id
-            Some(1),                           // node_id
-            "critical".to_string(),            // severity
-            "Block height too low".to_string(), // title
+            1,                                             // rule_id
+            Some(1),                                       // node_id
+            "critical".to_string(),                        // severity
+            "Block height too low".to_string(),            // title
             "Block height is below threshold".to_string(), // message
-            Some(99000.0),                     // metric_value
-            Some(100000.0),                    // threshold_value
+            Some(99000.0),                                 // metric_value
+            Some(100000.0),                                // threshold_value
         )
     }
 
@@ -448,4 +443,3 @@ mod tests {
         assert!(html.contains("#4caf50")); // Success color
     }
 }
-

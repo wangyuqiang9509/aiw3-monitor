@@ -19,17 +19,12 @@ pub struct EvaluationResult {
 
 impl AlertEvaluator {
     /// 评估告警规则
-    pub fn evaluate(
-        rule: &AlertRule,
-        metrics: &[MetricData],
-    ) -> Result<EvaluationResult> {
-        debug!(
-            "Evaluating alert rule: {} (type: {})",
-            rule.name, rule.condition_type
-        );
+    pub fn evaluate(rule: &AlertRule, metrics: &[MetricData]) -> Result<EvaluationResult> {
+        debug!("Evaluating alert rule: {} (type: {})", rule.name, rule.condition_type);
 
-        let condition_type = ConditionType::from_str(&rule.condition_type)
-            .ok_or_else(|| AppError::validation(format!("Invalid condition type: {}", rule.condition_type)))?;
+        let condition_type = ConditionType::from_str(&rule.condition_type).ok_or_else(|| {
+            AppError::validation(format!("Invalid condition type: {}", rule.condition_type))
+        })?;
 
         match condition_type {
             ConditionType::Threshold => Self::evaluate_threshold(rule, metrics),
@@ -39,10 +34,7 @@ impl AlertEvaluator {
     }
 
     /// 评估阈值条件
-    fn evaluate_threshold(
-        rule: &AlertRule,
-        metrics: &[MetricData],
-    ) -> Result<EvaluationResult> {
+    fn evaluate_threshold(rule: &AlertRule, metrics: &[MetricData]) -> Result<EvaluationResult> {
         if metrics.is_empty() {
             return Ok(EvaluationResult {
                 triggered: false,
@@ -59,9 +51,8 @@ impl AlertEvaluator {
             .ok_or_else(|| AppError::validation("No metrics found"))?;
 
         let current_value = latest_metric.metric_value;
-        let threshold = rule
-            .threshold_value
-            .ok_or_else(|| AppError::validation("Threshold value not set"))?;
+        let threshold =
+            rule.threshold_value.ok_or_else(|| AppError::validation("Threshold value not set"))?;
 
         // 使用默认的比较运算符（大于）
         // 因为 comparison_operator 字段已被删除
@@ -86,19 +77,11 @@ impl AlertEvaluator {
             rule.name, triggered, current_value, threshold
         );
 
-        Ok(EvaluationResult {
-            triggered,
-            current_value,
-            threshold_value: Some(threshold),
-            message,
-        })
+        Ok(EvaluationResult { triggered, current_value, threshold_value: Some(threshold), message })
     }
 
     /// 评估时间窗口条件（指标在指定时间内无变化）
-    fn evaluate_time_window(
-        rule: &AlertRule,
-        metrics: &[MetricData],
-    ) -> Result<EvaluationResult> {
+    fn evaluate_time_window(rule: &AlertRule, metrics: &[MetricData]) -> Result<EvaluationResult> {
         if metrics.is_empty() {
             return Ok(EvaluationResult {
                 triggered: false,
@@ -114,10 +97,8 @@ impl AlertEvaluator {
         let window_start = now - chrono::Duration::seconds(window_seconds as i64);
 
         // 获取时间窗口内的指标
-        let window_metrics: Vec<_> = metrics
-            .iter()
-            .filter(|m| m.collected_at >= window_start)
-            .collect();
+        let window_metrics: Vec<_> =
+            metrics.iter().filter(|m| m.collected_at >= window_start).collect();
 
         if window_metrics.is_empty() {
             return Ok(EvaluationResult {
@@ -173,19 +154,16 @@ impl AlertEvaluator {
             });
         }
 
-        let threshold = rule
-            .threshold_value
-            .ok_or_else(|| AppError::validation("Threshold value not set"))?;
+        let threshold =
+            rule.threshold_value.ok_or_else(|| AppError::validation("Threshold value not set"))?;
 
         let window_seconds = rule.time_window_seconds; // 直接使用，不是 Option
         let now = Utc::now();
         let window_start = now - chrono::Duration::seconds(window_seconds as i64);
 
         // 获取时间窗口内的指标
-        let window_metrics: Vec<_> = metrics
-            .iter()
-            .filter(|m| m.collected_at >= window_start)
-            .collect();
+        let window_metrics: Vec<_> =
+            metrics.iter().filter(|m| m.collected_at >= window_start).collect();
 
         if window_metrics.len() < 2 {
             return Ok(EvaluationResult {
@@ -272,10 +250,7 @@ mod tests {
         )
         .with_threshold(100000.0);
 
-        let metrics = create_test_metrics(
-            vec![150000.0],
-            vec![Utc::now()],
-        );
+        let metrics = create_test_metrics(vec![150000.0], vec![Utc::now()]);
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
         assert!(result.triggered);
@@ -295,10 +270,7 @@ mod tests {
         )
         .with_threshold(100000.0);
 
-        let metrics = create_test_metrics(
-            vec![50000.0],
-            vec![Utc::now()],
-        );
+        let metrics = create_test_metrics(vec![50000.0], vec![Utc::now()]);
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
         assert!(!result.triggered);
@@ -321,11 +293,7 @@ mod tests {
         // 创建5分钟内值不变的指标
         let metrics = create_test_metrics(
             vec![100000.0, 100000.0, 100000.0],
-            vec![
-                now - chrono::Duration::seconds(300),
-                now - chrono::Duration::seconds(150),
-                now,
-            ],
+            vec![now - chrono::Duration::seconds(300), now - chrono::Duration::seconds(150), now],
         );
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
@@ -348,11 +316,7 @@ mod tests {
         // 创建5分钟内值有变化的指标
         let metrics = create_test_metrics(
             vec![100000.0, 100100.0, 100200.0],
-            vec![
-                now - chrono::Duration::seconds(300),
-                now - chrono::Duration::seconds(150),
-                now,
-            ],
+            vec![now - chrono::Duration::seconds(300), now - chrono::Duration::seconds(150), now],
         );
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
@@ -378,12 +342,16 @@ mod tests {
             vec![100000.0, 80000.0],
             vec![
                 now - chrono::Duration::seconds(500), // 在窗口内
-                now - chrono::Duration::seconds(10),   // 在窗口内
+                now - chrono::Duration::seconds(10),  // 在窗口内
             ],
         );
 
         let result = AlertEvaluator::evaluate(&rule, &metrics).unwrap();
-        assert!(result.triggered, "Expected alert to be triggered, but it wasn't. Result: {:?}", result);
+        assert!(
+            result.triggered,
+            "Expected alert to be triggered, but it wasn't. Result: {:?}",
+            result
+        );
         assert!(result.current_value.abs() > 10.0); // 变化率的绝对值 > 10%
     }
 

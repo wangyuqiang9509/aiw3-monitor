@@ -37,8 +37,6 @@ services:
       - '--storage.tsdb.retention.time=30d'
     networks:
       - aiw3-network
-    depends_on:
-      - aiw3-monitor
 
   alertmanager:
     image: prom/alertmanager:v0.26.0
@@ -76,24 +74,24 @@ services:
       - prometheus
       - alertmanager
 
-  aiw3-monitor:
-    build:
-      context: ../../
-      dockerfile: deployment/docker/Dockerfile
-    container_name: aiw3-monitor
-    ports:
-      - "9090:9090"
-    environment:
-      RUST_LOG: info
-      DATABASE_URL: postgres://postgres:secret@postgres:5432/aiw3_monitor
-    volumes:
-      - ../../backend/config.docker.toml:/app/config.toml
-    networks:
-      - aiw3-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+  # aiw3-monitor:
+  #   build:
+  #     context: ../../
+  #     dockerfile: deployment/docker/Dockerfile
+  #   container_name: aiw3-monitor
+  #   ports:
+  #     - "9090:9090"
+  #   environment:
+  #     RUST_LOG: info
+  #     DATABASE_URL: postgres://postgres:secret@postgres:5432/aiw3_monitor
+  #   volumes:
+  #     - ../../backend/config.docker.toml:/app/config.toml
+  #   networks:
+  #     - aiw3-network
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
 
 volumes:
   postgres-data:

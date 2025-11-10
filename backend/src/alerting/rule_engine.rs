@@ -1,4 +1,4 @@
-use crate::error::{AppError, Result};
+use crate::error::Result;
 use crate::models::alert_event::AlertEvent;
 use crate::models::alert_rule::AlertRule;
 use crate::models::metric::MetricData;
@@ -127,8 +127,7 @@ impl AlertRuleEngine {
         } else {
             if !active_alerts.is_empty() {
                 // 告警已恢复
-                self.resolve_alerts(rule, &active_alerts, node.as_ref())
-                    .await?;
+                self.resolve_alerts(rule, &active_alerts, node.as_ref()).await?;
                 Ok(RuleCheckStatus::Resolved)
             } else {
                 // 无告警
@@ -202,19 +201,12 @@ impl AlertRuleEngine {
             self.alert_store.update_event(&updated_alert).await?;
 
             // 发送恢复通知
-            match self
-                .notifier
-                .send_resolution(&updated_alert, rule, node)
-                .await
-            {
+            match self.notifier.send_resolution(&updated_alert, rule, node).await {
                 Ok(_) => {
                     info!("Resolution notification sent for alert: {}", alert.id);
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to send resolution notification for alert {}: {}",
-                        alert.id, e
-                    );
+                    warn!("Failed to send resolution notification for alert {}: {}", alert.id, e);
                 }
             }
         }
@@ -225,7 +217,7 @@ impl AlertRuleEngine {
     /// 获取规则相关的指标数据
     async fn get_metrics_for_rule(&self, rule: &AlertRule) -> Result<Vec<MetricData>> {
         use crate::models::metric::MetricType;
-        
+
         // 根据规则的时间窗口获取指标
         let window_seconds = rule.time_window_seconds; // 直接使用，不是 Option
         let end_time = Utc::now();
@@ -254,11 +246,7 @@ impl AlertRuleEngine {
             .get_range(rule.node_id.unwrap_or(0), metric_type, start_time, end_time)
             .await?;
 
-        debug!(
-            "Retrieved {} metrics for rule: {}",
-            metrics.len(),
-            rule.name
-        );
+        debug!("Retrieved {} metrics for rule: {}", metrics.len(), rule.name);
 
         Ok(metrics)
     }

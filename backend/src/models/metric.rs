@@ -14,6 +14,7 @@ pub enum MetricType {
     Tps,
     MemIavlHeight,
     BlockStmConflicts,
+    ApiLatency, // API 响应延迟
 }
 
 /// 原始监控数据点

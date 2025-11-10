@@ -2,7 +2,7 @@
 // 负责清理过期的原始数据和告警事件，执行数据保留策略
 
 use crate::error::Result;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::time::interval;
@@ -21,18 +21,12 @@ impl CleanupScheduler {
     /// - `pool`: 数据库连接池
     /// - `check_interval_seconds`: 检查间隔（秒），建议每天运行一次
     pub fn new(pool: Arc<PgPool>, check_interval_seconds: u64) -> Self {
-        Self {
-            pool,
-            check_interval: std::time::Duration::from_secs(check_interval_seconds),
-        }
+        Self { pool, check_interval: std::time::Duration::from_secs(check_interval_seconds) }
     }
 
     /// 启动调度器（持续运行）
     pub async fn start(&self) {
-        info!(
-            "Starting cleanup scheduler with interval: {:?}",
-            self.check_interval
-        );
+        info!("Starting cleanup scheduler with interval: {:?}", self.check_interval);
 
         let mut ticker = interval(self.check_interval);
 
@@ -204,41 +198,31 @@ impl CleanupScheduler {
 
     /// 获取数据库大小统计
     pub async fn get_database_size_stats(&self) -> Result<DatabaseSizeStats> {
-        let total_size: i64 = sqlx::query_scalar(
-            "SELECT pg_database_size(current_database())"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let total_size: i64 = sqlx::query_scalar("SELECT pg_database_size(current_database())")
+            .fetch_one(self.pool.as_ref())
+            .await?;
 
-        let metrics_size: i64 = sqlx::query_scalar(
-            "SELECT pg_total_relation_size('metric_data')"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let metrics_size: i64 = sqlx::query_scalar("SELECT pg_total_relation_size('metric_data')")
+            .fetch_one(self.pool.as_ref())
+            .await?;
 
-        let hourly_size: i64 = sqlx::query_scalar(
-            "SELECT pg_total_relation_size('hourly_metrics')"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let hourly_size: i64 =
+            sqlx::query_scalar("SELECT pg_total_relation_size('hourly_metrics')")
+                .fetch_one(self.pool.as_ref())
+                .await?;
 
-        let daily_size: i64 = sqlx::query_scalar(
-            "SELECT pg_total_relation_size('daily_metrics')"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let daily_size: i64 = sqlx::query_scalar("SELECT pg_total_relation_size('daily_metrics')")
+            .fetch_one(self.pool.as_ref())
+            .await?;
 
-        let monthly_size: i64 = sqlx::query_scalar(
-            "SELECT pg_total_relation_size('monthly_metrics')"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let monthly_size: i64 =
+            sqlx::query_scalar("SELECT pg_total_relation_size('monthly_metrics')")
+                .fetch_one(self.pool.as_ref())
+                .await?;
 
-        let alerts_size: i64 = sqlx::query_scalar(
-            "SELECT pg_total_relation_size('alert_events')"
-        )
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        let alerts_size: i64 = sqlx::query_scalar("SELECT pg_total_relation_size('alert_events')")
+            .fetch_one(self.pool.as_ref())
+            .await?;
 
         Ok(DatabaseSizeStats {
             total_size_bytes: total_size,
@@ -330,7 +314,7 @@ mod tests {
     #[test]
     fn test_database_size_stats_human_readable() {
         let stats = DatabaseSizeStats {
-            total_size_bytes: 10737418240, // 10 GB
+            total_size_bytes: 10737418240,  // 10 GB
             metrics_size_bytes: 1073741824, // 1 GB
             hourly_size_bytes: 104857600,   // 100 MB
             daily_size_bytes: 10485760,     // 10 MB
@@ -343,4 +327,3 @@ mod tests {
         assert!(readable.contains("1.00 GB"));
     }
 }
-

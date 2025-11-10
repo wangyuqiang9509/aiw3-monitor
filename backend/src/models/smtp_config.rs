@@ -82,10 +82,7 @@ impl SmtpConfig {
 
     /// 获取连接字符串（用于日志，不包含密码）
     pub fn connection_string(&self) -> String {
-        format!(
-            "{}@{}:{} (TLS: {})",
-            self.username, self.server, self.port, self.use_tls
-        )
+        format!("{}@{}:{} (TLS: {})", self.username, self.server, self.port, self.use_tls)
     }
 }
 
@@ -170,10 +167,7 @@ mod tests {
         );
 
         assert!(config.validate().is_err());
-        assert_eq!(
-            config.validate().unwrap_err(),
-            "SMTP server cannot be empty"
-        );
+        assert_eq!(config.validate().unwrap_err(), "SMTP server cannot be empty");
     }
 
     #[test]
@@ -217,10 +211,7 @@ mod tests {
         );
 
         assert!(config.validate().is_err());
-        assert_eq!(
-            config.validate().unwrap_err(),
-            "Invalid from address format"
-        );
+        assert_eq!(config.validate().unwrap_err(), "Invalid from address format");
     }
 
     #[test]

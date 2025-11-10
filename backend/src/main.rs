@@ -45,23 +45,56 @@ async fn main() -> Result<()> {
     let collector = collectors::metrics_collector::MetricsCollector::new(
         db_pool.clone(),
         metrics_registry.clone(),
-    );
-    
+    )
+    .expect("Failed to create MetricsCollector");
+
+    // 为所有启用的节点注册 TPS 和延迟计算器
+    let node_store_temp = storage::node_store::NodeStore::new(db_pool.clone());
+    match node_store_temp.get_enabled_nodes().await {
+        Ok(nodes) => {
+            for node in nodes {
+                // 注册 TPS 计算器
+                collector
+                    .register_tps_calculator_with_window(
+                        node.name.clone(),
+                        60, // 60 秒滑动窗口
+                    )
+                    .await;
+                info!("Registered TPS calculator for node: {}", node.name);
+
+                // 注册延迟计算器
+                collector
+                    .register_latency_calculator_with_window(
+                        node.name.clone(),
+                        10, // 10 个区块滑动窗口
+                    )
+                    .await;
+                info!("Registered latency calculator for node: {}", node.name);
+            }
+        }
+        Err(e) => {
+            error!("Failed to get enabled nodes for calculator registration: {}", e);
+        }
+    }
+
     let collection_scheduler = scheduler::collection_scheduler::CollectionScheduler::new(
         collector,
         settings.collection.interval_seconds,
     );
-    
+
     tokio::spawn(async move {
         collection_scheduler.run().await;
     });
-    info!("Started metrics collection scheduler (interval: {}s)", settings.collection.interval_seconds);
+    info!(
+        "Started metrics collection scheduler (interval: {}s)",
+        settings.collection.interval_seconds
+    );
 
     // 初始化存储层
     let alert_store = Arc::new(storage::alert_store::AlertStore::new(db_pool.clone()));
     let metrics_store = Arc::new(storage::metrics_store::MetricsStore::new(db_pool.clone()));
     let node_store = Arc::new(storage::node_store::NodeStore::new(db_pool.clone()));
-    
+
     // 初始化邮件通知器
     let smtp_config = models::smtp_config::SmtpConfig {
         id: 0,
@@ -80,7 +113,7 @@ async fn main() -> Result<()> {
         smtp_config,
         settings.alerting.max_retries,
     )?);
-    
+
     // 初始化告警引擎
     let alert_engine = Arc::new(alerting::rule_engine::AlertRuleEngine::new(
         alert_store,
@@ -95,7 +128,7 @@ async fn main() -> Result<()> {
         alert_engine.clone(),
         settings.alerting.check_interval_seconds,
     );
-    
+
     tokio::spawn(async move {
         alert_scheduler.start().await;
     });

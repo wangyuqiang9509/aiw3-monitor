@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
 use regex::Regex;
 use std::process::Command;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Docker Logs 采集器
 /// 用于从 Docker 容器日志中提取配置和优化特性信息
@@ -66,12 +66,7 @@ impl DockerLogsCollector {
     /// 获取容器日志
     async fn get_container_logs(&self, tail: usize) -> Result<String> {
         let output = Command::new("docker")
-            .args(&[
-                "logs",
-                "--tail",
-                &tail.to_string(),
-                &self.container_name,
-            ])
+            .args(&["logs", "--tail", &tail.to_string(), &self.container_name])
             .output()
             .map_err(|e| {
                 AppError::generic(format!("Failed to execute docker logs command: {}", e))
@@ -79,10 +74,7 @@ impl DockerLogsCollector {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(AppError::generic(format!(
-                "Docker logs command failed: {}",
-                stderr
-            )));
+            return Err(AppError::generic(format!("Docker logs command failed: {}", stderr)));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -97,7 +89,7 @@ impl DockerLogsCollector {
         // - "block-stm: enabled"
         // - "Block-STM enabled: true"
         // - "Using Block-STM execution"
-        
+
         if let Some(captures) = self.block_stm_regex.captures(logs) {
             if let Some(value) = captures.get(1) {
                 let val = value.as_str().to_lowercase();
@@ -106,7 +98,7 @@ impl DockerLogsCollector {
         }
 
         // 检查是否有明确的启用消息
-        logs.to_lowercase().contains("block-stm") 
+        logs.to_lowercase().contains("block-stm")
             && (logs.to_lowercase().contains("enabled") || logs.to_lowercase().contains("using"))
     }
 
@@ -115,7 +107,7 @@ impl DockerLogsCollector {
         // 查找工作线程数配置
         // 示例: "block-stm.workers: 4" 或 "Block-STM workers: 8"
         let workers_regex = Regex::new(r"(?i)block[-_]?stm[.\s]+workers?[:\s]+(\d+)").ok()?;
-        
+
         if let Some(captures) = workers_regex.captures(logs) {
             if let Some(value) = captures.get(1) {
                 return value.as_str().parse::<i32>().ok();
@@ -134,7 +126,7 @@ impl DockerLogsCollector {
             }
         }
 
-        logs.to_lowercase().contains("memiavl") 
+        logs.to_lowercase().contains("memiavl")
             && (logs.to_lowercase().contains("enabled") || logs.to_lowercase().contains("using"))
     }
 
@@ -143,7 +135,7 @@ impl DockerLogsCollector {
         // 查找缓存大小配置
         // 示例: "memiavl.cache-size: 1000000" 或 "MemIAVL cache size: 1000000 nodes"
         let cache_regex = Regex::new(r"(?i)memiavl[.\s]+cache[-_]?size[:\s]+(\d+)").ok()?;
-        
+
         if let Some(captures) = cache_regex.captures(logs) {
             if let Some(value) = captures.get(1) {
                 return value.as_str().parse::<i64>().ok();
@@ -158,7 +150,7 @@ impl DockerLogsCollector {
         // 查找快照间隔配置
         // 示例: "memiavl.snapshot-interval: 10000" 或 "Snapshot interval: 10000 blocks"
         let interval_regex = Regex::new(r"(?i)snapshot[-_]?interval[:\s]+(\d+)").ok()?;
-        
+
         if let Some(captures) = interval_regex.captures(logs) {
             if let Some(value) = captures.get(1) {
                 return value.as_str().parse::<i32>().ok();
@@ -177,7 +169,7 @@ impl DockerLogsCollector {
             }
         }
 
-        logs.to_lowercase().contains("zero-copy") 
+        logs.to_lowercase().contains("zero-copy")
             && (logs.to_lowercase().contains("enabled") || logs.to_lowercase().contains("using"))
     }
 }
@@ -202,18 +194,9 @@ mod tests {
     fn test_parse_block_stm_workers() {
         let collector = DockerLogsCollector::new("test-container".to_string());
 
-        assert_eq!(
-            collector.parse_block_stm_workers("block-stm.workers: 4"),
-            Some(4)
-        );
-        assert_eq!(
-            collector.parse_block_stm_workers("Block-STM workers: 8"),
-            Some(8)
-        );
-        assert_eq!(
-            collector.parse_block_stm_workers("no workers config"),
-            None
-        );
+        assert_eq!(collector.parse_block_stm_workers("block-stm.workers: 4"), Some(4));
+        assert_eq!(collector.parse_block_stm_workers("Block-STM workers: 8"), Some(8));
+        assert_eq!(collector.parse_block_stm_workers("no workers config"), None);
     }
 
     #[test]
@@ -238,10 +221,7 @@ mod tests {
             collector.parse_memiavl_cache_size("MemIAVL cache size: 500000 nodes"),
             Some(500000)
         );
-        assert_eq!(
-            collector.parse_memiavl_cache_size("no cache config"),
-            None
-        );
+        assert_eq!(collector.parse_memiavl_cache_size("no cache config"), None);
     }
 
     #[test]
@@ -253,4 +233,3 @@ mod tests {
         assert!(!collector.parse_zero_copy_enabled("zero-copy: disabled"));
     }
 }
-

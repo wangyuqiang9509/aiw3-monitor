@@ -9,4 +9,3 @@ fn benchmark_metrics_collection(_c: &mut Criterion) {
 
 criterion_group!(benches, benchmark_metrics_collection);
 criterion_main!(benches);
-

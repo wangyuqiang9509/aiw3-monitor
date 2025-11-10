@@ -1,6 +1,6 @@
 // Prometheus HTTP 服务器
+use tracing::{error, info};
 use warp::{Filter, Reply};
-use tracing::{info, error};
 
 use crate::error::Result;
 use crate::exporter::metrics_registry::MetricsRegistry;
@@ -21,11 +21,9 @@ pub async fn start_server(registry: MetricsRegistry, port: u16) -> Result<()> {
         .map(|| warp::reply::with_status("OK", warp::http::StatusCode::OK));
 
     // 根路径
-    let root_route = warp::path::end()
-        .and(warp::get())
-        .map(|| {
-            warp::reply::html(
-                r#"
+    let root_route = warp::path::end().and(warp::get()).map(|| {
+        warp::reply::html(
+            r#"
                 <html>
                 <head><title>AIWS Monitor</title></head>
                 <body>
@@ -38,8 +36,8 @@ pub async fn start_server(registry: MetricsRegistry, port: u16) -> Result<()> {
                 </body>
                 </html>
                 "#,
-            )
-        });
+        )
+    });
 
     // 添加 CORS 支持
     let cors = warp::cors()
@@ -51,9 +49,7 @@ pub async fn start_server(registry: MetricsRegistry, port: u16) -> Result<()> {
 
     info!("Prometheus HTTP server listening on 0.0.0.0:{}", port);
 
-    warp::serve(routes)
-        .run(([0, 0, 0, 0], port))
-        .await;
+    warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 
     Ok(())
 }
@@ -70,18 +66,12 @@ async fn metrics_handler(
     registry: MetricsRegistry,
 ) -> std::result::Result<impl Reply, warp::Rejection> {
     match registry.export() {
-        Ok(metrics) => Ok(warp::reply::with_header(
-            metrics,
-            "Content-Type",
-            "text/plain; version=0.0.4",
-        )),
+        Ok(metrics) => {
+            Ok(warp::reply::with_header(metrics, "Content-Type", "text/plain; version=0.0.4"))
+        }
         Err(e) => {
             error!("Failed to export metrics: {}", e);
-            Ok(warp::reply::with_header(
-                format!("Error: {}", e),
-                "Content-Type",
-                "text/plain",
-            ))
+            Ok(warp::reply::with_header(format!("Error: {}", e), "Content-Type", "text/plain"))
         }
     }
 }

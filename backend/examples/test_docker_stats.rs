@@ -4,18 +4,12 @@ use aiw3_monitor::collectors::DockerStatsCollector;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日志
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
+    tracing_subscriber::fmt().with_env_filter("info").init();
 
     println!("=== AIW3 Monitor - Docker Stats 采集器测试 ===\n");
 
     // 测试容器列表
-    let containers = vec![
-        "aiw3defi-validator1",
-        "aiw3defi-validator2",
-        "aiw3defi-validator3",
-    ];
+    let containers = vec!["aiw3defi-validator1", "aiw3defi-validator2", "aiw3defi-validator3"];
 
     for container_name in containers {
         println!("📊 采集容器: {}", container_name);
@@ -42,20 +36,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("  内存使用率: {:.2}%", metrics.memory_percent);
                 println!();
                 println!("🌐 网络指标:");
-                println!(
-                    "  网络接收: {:.2} MB",
-                    metrics.network_rx_bytes as f64 / 1024.0 / 1024.0
-                );
-                println!(
-                    "  网络发送: {:.2} MB",
-                    metrics.network_tx_bytes as f64 / 1024.0 / 1024.0
-                );
+                println!("  网络接收: {:.2} MB", metrics.network_rx_bytes as f64 / 1024.0 / 1024.0);
+                println!("  网络发送: {:.2} MB", metrics.network_tx_bytes as f64 / 1024.0 / 1024.0);
                 println!();
                 println!("💿 磁盘指标:");
-                println!(
-                    "  磁盘读取: {:.2} MB",
-                    metrics.block_read_bytes as f64 / 1024.0 / 1024.0
-                );
+                println!("  磁盘读取: {:.2} MB", metrics.block_read_bytes as f64 / 1024.0 / 1024.0);
                 println!(
                     "  磁盘写入: {:.2} MB",
                     metrics.block_write_bytes as f64 / 1024.0 / 1024.0
@@ -94,4 +79,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ 测试完成!");
     Ok(())
 }
-

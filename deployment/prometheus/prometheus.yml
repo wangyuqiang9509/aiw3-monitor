@@ -11,10 +11,10 @@ rule_files:
 
 # 抓取配置
 scrape_configs:
-  # AIWS Monitor 导出器
+  # AIWS Monitor 导出器 (运行在 host 上)
   - job_name: 'aiw3-monitor'
     static_configs:
-      - targets: ['aiw3-monitor:9090']
+      - targets: ['172.21.240.200:9090']
         labels:
           service: 'blockchain-monitor'
 

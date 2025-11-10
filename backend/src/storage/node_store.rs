@@ -25,7 +25,7 @@ impl NodeStore {
             FROM blockchain_nodes
             WHERE enabled = true
             ORDER BY id
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -42,7 +42,7 @@ impl NodeStore {
                    enabled, labels, created_at, updated_at
             FROM blockchain_nodes
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -59,7 +59,7 @@ impl NodeStore {
                    enabled, labels, created_at, updated_at
             FROM blockchain_nodes
             WHERE name = $1
-            "#
+            "#,
         )
         .bind(name)
         .fetch_optional(&self.pool)
@@ -76,7 +76,7 @@ impl NodeStore {
                    enabled, labels, created_at, updated_at
             FROM blockchain_nodes
             ORDER BY id
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -112,7 +112,7 @@ impl NodeStore {
                 (name, rpc_url, rest_url, grpc_url, environment, enabled, labels)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
-            "#
+            "#,
         )
         .bind(&node.name)
         .bind(&node.rpc_url)
@@ -152,10 +152,9 @@ mod tests {
     #[tokio::test]
     #[ignore] // 需要数据库连接
     async fn test_get_enabled_nodes() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
+        });
 
         let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
         let store = NodeStore::new(pool);
@@ -167,10 +166,9 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_get_by_name() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| {
-                "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
-            });
+        let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:secret@localhost:5432/aiw3_monitor_test".to_string()
+        });
 
         let pool = sqlx::PgPool::connect(&database_url).await.unwrap();
         let store = NodeStore::new(pool);

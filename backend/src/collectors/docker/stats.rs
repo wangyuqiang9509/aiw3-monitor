@@ -50,13 +50,7 @@ impl DockerStatsCollector {
             let container_name = self.container_name.clone();
             move || {
                 Command::new("docker")
-                    .args(&[
-                        "stats",
-                        "--no-stream",
-                        "--format",
-                        "json",
-                        &container_name,
-                    ])
+                    .args(&["stats", "--no-stream", "--format", "json", &container_name])
                     .output()
             }
         })
@@ -80,7 +74,10 @@ impl DockerStatsCollector {
             container_name: self.container_name.clone(),
             cpu_percent: parse_cpu_percent(stats["CPUPerc"].as_str().unwrap_or("0%"))?,
             memory_bytes: parse_memory_bytes(stats["MemUsage"].as_str().unwrap_or("0B / 0B"))?.0,
-            memory_limit_bytes: parse_memory_bytes(stats["MemUsage"].as_str().unwrap_or("0B / 0B"))?.1,
+            memory_limit_bytes: parse_memory_bytes(
+                stats["MemUsage"].as_str().unwrap_or("0B / 0B"),
+            )?
+            .1,
             memory_percent: parse_percentage(stats["MemPerc"].as_str().unwrap_or("0%"))?,
             network_rx_bytes: parse_network_io(stats["NetIO"].as_str().unwrap_or("0B / 0B"))?.0,
             network_tx_bytes: parse_network_io(stats["NetIO"].as_str().unwrap_or("0B / 0B"))?.1,
@@ -108,17 +105,17 @@ impl DockerStatsCollector {
 /// 解析 CPU 百分比 "450.32%" -> 450.32
 fn parse_cpu_percent(s: &str) -> Result<f64> {
     let cleaned = s.trim().trim_end_matches('%');
-    cleaned
-        .parse::<f64>()
-        .map_err(|e| crate::error::AppError::generic(format!("Failed to parse CPU percent '{}': {}", s, e)))
+    cleaned.parse::<f64>().map_err(|e| {
+        crate::error::AppError::generic(format!("Failed to parse CPU percent '{}': {}", s, e))
+    })
 }
 
 /// 解析百分比 "40.59%" -> 40.59
 fn parse_percentage(s: &str) -> Result<f64> {
     let cleaned = s.trim().trim_end_matches('%');
-    cleaned
-        .parse::<f64>()
-        .map_err(|e| crate::error::AppError::generic(format!("Failed to parse percentage '{}': {}", s, e)))
+    cleaned.parse::<f64>().map_err(|e| {
+        crate::error::AppError::generic(format!("Failed to parse percentage '{}': {}", s, e))
+    })
 }
 
 /// 解析内存使用量 "3.247GiB / 8GiB" -> (3485989273, 8589934592)
@@ -164,53 +161,63 @@ fn parse_block_io(s: &str) -> Result<(u64, u64)> {
 /// 支持: B, KB, KiB, MB, MiB, GB, GiB, TB, TiB
 fn parse_size_to_bytes(s: &str) -> Result<u64> {
     let s = s.trim();
-    
+
     if s == "0B" || s == "0" {
         return Ok(0);
     }
-    
+
     // 尝试匹配不同的单位
     if let Some(num_str) = s.strip_suffix("TiB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1024.0 * 1024.0 * 1024.0 * 1024.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("TB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1000.0 * 1000.0 * 1000.0 * 1000.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("GiB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1024.0 * 1024.0 * 1024.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("GB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1000.0 * 1000.0 * 1000.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("MiB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1024.0 * 1024.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("MB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1000.0 * 1000.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("KiB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1024.0) as u64);
     } else if let Some(num_str) = s.strip_suffix("KB") {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok((num * 1000.0) as u64);
     } else if let Some(num_str) = s.strip_suffix('B') {
-        let num = num_str.parse::<f64>()
-            .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))?;
+        let num = num_str.parse::<f64>().map_err(|e| {
+            crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+        })?;
         return Ok(num as u64);
     }
-    
+
     // 如果没有单位，假设是字节
-    s.parse::<u64>()
-        .map_err(|e| crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e)))
+    s.parse::<u64>().map_err(|e| {
+        crate::error::AppError::generic(format!("Failed to parse size '{}': {}", s, e))
+    })
 }
 
 // ============================================================================
@@ -273,4 +280,3 @@ mod tests {
         assert!(size < 4_000_000_000);
     }
 }
-

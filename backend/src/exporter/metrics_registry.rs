@@ -1,9 +1,8 @@
 // Prometheus 指标注册器
-use prometheus::{
-    core::Collector, Encoder, Gauge, GaugeVec, Opts, Registry, TextEncoder,
-};
+use prometheus::{Encoder, GaugeVec, Opts, Registry, TextEncoder};
 use tracing::info;
 
+use crate::collectors::blockchain_metrics::ConsensusMetrics;
 use crate::error::Result;
 
 /// Prometheus 指标注册器
@@ -49,11 +48,60 @@ pub struct MetricsRegistry {
     pub validator_online: GaugeVec,
     pub validator_total_voting_power: GaugeVec,
     pub validator_average_voting_power: GaugeVec,
+    // 共识状态指标
+    pub consensus_height: GaugeVec,
+    pub consensus_round: GaugeVec,
+    pub consensus_step: GaugeVec,
     // 网络指标
     pub network_inbound_peers: GaugeVec,
     pub network_outbound_peers: GaugeVec,
     pub network_total_peers: GaugeVec,
     pub network_listening_addresses: GaugeVec,
+    // 延迟指标 - 区块时间
+    pub chain_block_time_current: GaugeVec,
+    pub chain_block_time_average: GaugeVec,
+    pub chain_block_time_min: GaugeVec,
+    pub chain_block_time_max: GaugeVec,
+    pub chain_block_time_std_dev: GaugeVec,
+    // 延迟指标 - API 响应时间
+    pub api_latency_ms: GaugeVec,
+    // 执行指标 - 静态配置（来自 performance-metrics.json）
+    pub blockchain_block_stm_enabled: GaugeVec,
+    pub blockchain_block_stm_workers: GaugeVec,
+    pub blockchain_block_stm_pre_estimation: GaugeVec,
+    // 存储指标 - MemIAVL 配置
+    pub blockchain_memiavl_enabled: GaugeVec,
+    pub blockchain_memiavl_cache_size: GaugeVec,
+    pub blockchain_memiavl_zero_copy: GaugeVec,
+    pub blockchain_memiavl_async_commit_buffer: GaugeVec,
+    pub blockchain_memiavl_snapshot_interval: GaugeVec,
+    pub blockchain_memiavl_target_cache_hit_rate: GaugeVec,
+    pub blockchain_memiavl_target_commit_latency_ms: GaugeVec,
+    pub blockchain_memiavl_performance_gain: GaugeVec,
+    // 存储指标 - IAVL 配置
+    pub blockchain_iavl_cache_size: GaugeVec,
+    pub blockchain_iavl_inter_block_cache: GaugeVec,
+    // 存储指标 - 数据库配置（使用 label 存储字符串值）
+    pub blockchain_database_info: GaugeVec,
+    // 执行指标 - 动态指标（来自 RPC /abci_info）
+    pub blockchain_app_version_info: GaugeVec,
+    pub blockchain_abci_last_block_height: GaugeVec,
+    // 执行指标 - 计算指标（执行性能）
+    pub execution_actual_tps: GaugeVec,
+    pub execution_speedup: GaugeVec,
+    pub execution_parallelism_rate: GaugeVec,
+    // 网络配置目标指标（静态配置）
+    pub network_target_send_rate: GaugeVec,
+    pub network_target_recv_rate: GaugeVec,
+    pub network_target_max_inbound_peers: GaugeVec,
+    pub network_target_max_outbound_peers: GaugeVec,
+    // 优化特性 - Optimistic Execution (ABCI++)
+    pub blockchain_optimistic_execution_enabled: GaugeVec,
+    // 优化特性 - Large Block Size
+    pub blockchain_large_blocks_enabled: GaugeVec,
+    pub blockchain_large_blocks_max_size_mb: GaugeVec,
+    // 优化特性 - 统一摘要指标（使用标签存储所有特性状态）
+    pub blockchain_optimization_features_info: GaugeVec,
 }
 
 impl MetricsRegistry {
@@ -70,10 +118,7 @@ impl MetricsRegistry {
 
         // 区块时间
         let block_time = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_block_time_seconds",
-                "Time since last block in seconds",
-            ),
+            Opts::new("aiw3_chain_block_time_seconds", "Time since last block in seconds"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(block_time.clone()))?;
@@ -87,20 +132,14 @@ impl MetricsRegistry {
 
         // 交易池大小
         let tx_pool_size = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_tx_pool_size",
-                "Number of unconfirmed transactions",
-            ),
+            Opts::new("aiw3_chain_tx_pool_size", "Number of unconfirmed transactions"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(tx_pool_size.clone()))?;
 
         // 网络延迟
         let network_latency = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_network_latency_ms",
-                "Network latency in milliseconds",
-            ),
+            Opts::new("aiw3_chain_network_latency_ms", "Network latency in milliseconds"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(network_latency.clone()))?;
@@ -127,7 +166,7 @@ impl MetricsRegistry {
         registry.register(Box::new(sync_status.clone()))?;
 
         // ========== 资源指标 ==========
-        
+
         // CPU 使用率
         let container_cpu_percent = GaugeVec::new(
             Opts::new(
@@ -140,70 +179,49 @@ impl MetricsRegistry {
 
         // 内存使用量（字节）
         let container_memory_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_memory_bytes",
-                "Container memory usage in bytes",
-            ),
+            Opts::new("aiw3_container_memory_bytes", "Container memory usage in bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_memory_bytes.clone()))?;
 
         // 内存限制（字节）
         let container_memory_limit_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_memory_limit_bytes",
-                "Container memory limit in bytes",
-            ),
+            Opts::new("aiw3_container_memory_limit_bytes", "Container memory limit in bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_memory_limit_bytes.clone()))?;
 
         // 内存使用率
         let container_memory_percent = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_memory_percent",
-                "Container memory usage percentage",
-            ),
+            Opts::new("aiw3_container_memory_percent", "Container memory usage percentage"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_memory_percent.clone()))?;
 
         // 网络接收字节数
         let container_network_rx_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_network_rx_bytes",
-                "Container network received bytes",
-            ),
+            Opts::new("aiw3_container_network_rx_bytes", "Container network received bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_network_rx_bytes.clone()))?;
 
         // 网络发送字节数
         let container_network_tx_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_network_tx_bytes",
-                "Container network transmitted bytes",
-            ),
+            Opts::new("aiw3_container_network_tx_bytes", "Container network transmitted bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_network_tx_bytes.clone()))?;
 
         // 磁盘读取字节数
         let container_block_read_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_block_read_bytes",
-                "Container disk read bytes",
-            ),
+            Opts::new("aiw3_container_block_read_bytes", "Container disk read bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_block_read_bytes.clone()))?;
 
         // 磁盘写入字节数
         let container_block_write_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_container_block_write_bytes",
-                "Container disk write bytes",
-            ),
+            Opts::new("aiw3_container_block_write_bytes", "Container disk write bytes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(container_block_write_bytes.clone()))?;
@@ -220,10 +238,7 @@ impl MetricsRegistry {
 
         // Block-STM 工作线程数
         let optimization_block_stm_workers = GaugeVec::new(
-            Opts::new(
-                "aiw3_optimization_block_stm_workers",
-                "Number of Block-STM worker threads",
-            ),
+            Opts::new("aiw3_optimization_block_stm_workers", "Number of Block-STM worker threads"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(optimization_block_stm_workers.clone()))?;
@@ -240,10 +255,7 @@ impl MetricsRegistry {
 
         // MemIAVL 缓存大小
         let optimization_memiavl_cache_size = GaugeVec::new(
-            Opts::new(
-                "aiw3_optimization_memiavl_cache_size",
-                "MemIAVL cache size in nodes",
-            ),
+            Opts::new("aiw3_optimization_memiavl_cache_size", "MemIAVL cache size in nodes"),
             &["container", "node", "environment"],
         )?;
         registry.register(Box::new(optimization_memiavl_cache_size.clone()))?;
@@ -270,40 +282,28 @@ impl MetricsRegistry {
 
         // 当前 TPS
         let chain_tps_current = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_tps_current",
-                "Current transactions per second",
-            ),
+            Opts::new("aiw3_chain_tps_current", "Current transactions per second"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(chain_tps_current.clone()))?;
 
         // 平均 TPS
         let chain_tps_average = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_tps_average",
-                "Average transactions per second",
-            ),
+            Opts::new("aiw3_chain_tps_average", "Average transactions per second"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(chain_tps_average.clone()))?;
 
         // 峰值 TPS
         let chain_tps_peak = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_tps_peak",
-                "Peak transactions per second",
-            ),
+            Opts::new("aiw3_chain_tps_peak", "Peak transactions per second"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(chain_tps_peak.clone()))?;
 
         // 总交易数（时间窗口内）
         let chain_total_transactions = GaugeVec::new(
-            Opts::new(
-                "aiw3_chain_total_transactions",
-                "Total transactions in time window",
-            ),
+            Opts::new("aiw3_chain_total_transactions", "Total transactions in time window"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(chain_total_transactions.clone()))?;
@@ -320,105 +320,421 @@ impl MetricsRegistry {
 
         // Mempool 大小（字节）
         let mempool_size_bytes = GaugeVec::new(
-            Opts::new(
-                "aiw3_mempool_size_bytes",
-                "Size of mempool in bytes",
-            ),
+            Opts::new("aiw3_mempool_size_bytes", "Size of mempool in bytes"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(mempool_size_bytes.clone()))?;
 
         // Mempool 总交易数
         let mempool_total_txs = GaugeVec::new(
-            Opts::new(
-                "aiw3_mempool_total_txs",
-                "Total transactions in mempool",
-            ),
+            Opts::new("aiw3_mempool_total_txs", "Total transactions in mempool"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(mempool_total_txs.clone()))?;
 
         // 验证者总数
         let validator_total = GaugeVec::new(
-            Opts::new(
-                "aiw3_validator_total",
-                "Total number of validators",
-            ),
+            Opts::new("aiw3_validator_total", "Total number of validators"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(validator_total.clone()))?;
 
         // 在线验证者数量
         let validator_online = GaugeVec::new(
-            Opts::new(
-                "aiw3_validator_online",
-                "Number of online validators",
-            ),
+            Opts::new("aiw3_validator_online", "Number of online validators"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(validator_online.clone()))?;
 
         // 总投票权
         let validator_total_voting_power = GaugeVec::new(
-            Opts::new(
-                "aiw3_validator_total_voting_power",
-                "Total voting power of all validators",
-            ),
+            Opts::new("aiw3_validator_total_voting_power", "Total voting power of all validators"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(validator_total_voting_power.clone()))?;
 
         // 平均投票权
         let validator_average_voting_power = GaugeVec::new(
-            Opts::new(
-                "aiw3_validator_average_voting_power",
-                "Average voting power per validator",
-            ),
+            Opts::new("aiw3_validator_average_voting_power", "Average voting power per validator"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(validator_average_voting_power.clone()))?;
 
+        // 共识高度
+        let consensus_height = GaugeVec::new(
+            Opts::new("aiw3_consensus_height", "Current consensus height"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(consensus_height.clone()))?;
+
+        // 共识轮次
+        let consensus_round = GaugeVec::new(
+            Opts::new("aiw3_consensus_round", "Current consensus round"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(consensus_round.clone()))?;
+
+        // 共识步骤
+        let consensus_step = GaugeVec::new(
+            Opts::new(
+                "aiw3_consensus_step",
+                "Current consensus step (1=propose, 2=prevote, 3=precommit, 4=commit)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(consensus_step.clone()))?;
+
         // 入站连接数
         let network_inbound_peers = GaugeVec::new(
-            Opts::new(
-                "aiw3_network_inbound_peers",
-                "Number of inbound peer connections",
-            ),
+            Opts::new("aiw3_network_inbound_peers", "Number of inbound peer connections"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(network_inbound_peers.clone()))?;
 
         // 出站连接数
         let network_outbound_peers = GaugeVec::new(
-            Opts::new(
-                "aiw3_network_outbound_peers",
-                "Number of outbound peer connections",
-            ),
+            Opts::new("aiw3_network_outbound_peers", "Number of outbound peer connections"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(network_outbound_peers.clone()))?;
 
         // 总连接数
         let network_total_peers = GaugeVec::new(
-            Opts::new(
-                "aiw3_network_total_peers",
-                "Total number of peer connections",
-            ),
+            Opts::new("aiw3_network_total_peers", "Total number of peer connections"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(network_total_peers.clone()))?;
 
         // 监听地址数量
         let network_listening_addresses = GaugeVec::new(
-            Opts::new(
-                "aiw3_network_listening_addresses",
-                "Number of listening addresses",
-            ),
+            Opts::new("aiw3_network_listening_addresses", "Number of listening addresses"),
             &["node", "environment"],
         )?;
         registry.register(Box::new(network_listening_addresses.clone()))?;
 
-        info!("Prometheus metrics registry initialized with 37 metrics (8 blockchain + 8 resource + 6 optimization + 4 TPS + 3 mempool + 4 validator + 4 network)");
+        // ========== 延迟指标 - 区块时间 ==========
+
+        // 当前区块时间
+        let chain_block_time_current = GaugeVec::new(
+            Opts::new("aiw3_chain_block_time_current_seconds", "Current block time in seconds"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(chain_block_time_current.clone()))?;
+
+        // 平均区块时间
+        let chain_block_time_average = GaugeVec::new(
+            Opts::new(
+                "aiw3_chain_block_time_average_seconds",
+                "Average block time in seconds (sliding window)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(chain_block_time_average.clone()))?;
+
+        // 最小区块时间
+        let chain_block_time_min = GaugeVec::new(
+            Opts::new(
+                "aiw3_chain_block_time_min_seconds",
+                "Minimum block time in seconds (sliding window)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(chain_block_time_min.clone()))?;
+
+        // 最大区块时间
+        let chain_block_time_max = GaugeVec::new(
+            Opts::new(
+                "aiw3_chain_block_time_max_seconds",
+                "Maximum block time in seconds (sliding window)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(chain_block_time_max.clone()))?;
+
+        // 区块时间标准差
+        let chain_block_time_std_dev = GaugeVec::new(
+            Opts::new(
+                "aiw3_chain_block_time_std_dev_seconds",
+                "Standard deviation of block time in seconds (sliding window)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(chain_block_time_std_dev.clone()))?;
+
+        // ========== 延迟指标 - API 响应时间 ==========
+
+        // API 响应延迟
+        let api_latency_ms = GaugeVec::new(
+            Opts::new("aiw3_api_latency_ms", "API response latency in milliseconds"),
+            &["node", "environment", "endpoint"],
+        )?;
+        registry.register(Box::new(api_latency_ms.clone()))?;
+
+        // ========== 执行指标 - 静态配置 ==========
+
+        // Block-STM 启用状态
+        let blockchain_block_stm_enabled = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_block_stm_enabled",
+                "Whether Block-STM is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_block_stm_enabled.clone()))?;
+
+        // Block-STM 工作线程数
+        let blockchain_block_stm_workers = GaugeVec::new(
+            Opts::new("aiw3_blockchain_block_stm_workers", "Number of Block-STM worker threads"),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_block_stm_workers.clone()))?;
+
+        // Block-STM Pre-estimation 启用状态
+        let blockchain_block_stm_pre_estimation = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_block_stm_pre_estimation",
+                "Whether Block-STM pre-estimation is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_block_stm_pre_estimation.clone()))?;
+
+        // MemIAVL 启用状态
+        let blockchain_memiavl_enabled = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_enabled",
+                "Whether MemIAVL is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_enabled.clone()))?;
+
+        // MemIAVL 缓存大小
+        let blockchain_memiavl_cache_size = GaugeVec::new(
+            Opts::new("aiw3_blockchain_memiavl_cache_size", "MemIAVL cache size in nodes"),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_cache_size.clone()))?;
+
+        // MemIAVL Zero-Copy 启用状态
+        let blockchain_memiavl_zero_copy = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_zero_copy",
+                "Whether MemIAVL zero-copy is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_zero_copy.clone()))?;
+
+        // MemIAVL 异步提交缓冲区大小
+        let blockchain_memiavl_async_commit_buffer = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_async_commit_buffer",
+                "MemIAVL async commit buffer size",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_async_commit_buffer.clone()))?;
+
+        // MemIAVL 快照间隔（区块数）
+        let blockchain_memiavl_snapshot_interval = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_snapshot_interval",
+                "MemIAVL snapshot interval in blocks",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_snapshot_interval.clone()))?;
+
+        // MemIAVL 目标缓存命中率（百分比）
+        let blockchain_memiavl_target_cache_hit_rate = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_target_cache_hit_rate",
+                "MemIAVL target cache hit rate percentage",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_target_cache_hit_rate.clone()))?;
+
+        // MemIAVL 目标提交延迟（毫秒）
+        let blockchain_memiavl_target_commit_latency_ms = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_target_commit_latency_ms",
+                "MemIAVL target commit latency in milliseconds",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_target_commit_latency_ms.clone()))?;
+
+        // MemIAVL 性能提升倍数
+        let blockchain_memiavl_performance_gain = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_memiavl_performance_gain",
+                "MemIAVL performance gain multiplier",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_memiavl_performance_gain.clone()))?;
+
+        // ========== 存储指标 - IAVL 配置 ==========
+
+        // IAVL 缓存大小
+        let blockchain_iavl_cache_size = GaugeVec::new(
+            Opts::new("aiw3_blockchain_iavl_cache_size", "IAVL cache size in nodes"),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_iavl_cache_size.clone()))?;
+
+        // IAVL 区块间缓存启用状态
+        let blockchain_iavl_inter_block_cache = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_iavl_inter_block_cache",
+                "Whether IAVL inter-block cache is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_iavl_inter_block_cache.clone()))?;
+
+        // ========== 存储指标 - 数据库配置 ==========
+
+        // 数据库配置信息（使用 label 存储字符串值）
+        let blockchain_database_info = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_database_info",
+                "Database configuration information (value is always 1, config in labels)",
+            ),
+            &["node", "environment", "chain_id", "backend", "pruning_devnet", "pruning_production"],
+        )?;
+        registry.register(Box::new(blockchain_database_info.clone()))?;
+
+        // ========== 执行指标 - 动态指标（ABCI Info） ==========
+
+        // 应用版本信息
+        let blockchain_app_version_info = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_app_version_info",
+                "Application version information (value is always 1, version in label)",
+            ),
+            &["node", "environment", "version"],
+        )?;
+        registry.register(Box::new(blockchain_app_version_info.clone()))?;
+
+        // ABCI 最后区块高度
+        let blockchain_abci_last_block_height = GaugeVec::new(
+            Opts::new("aiw3_blockchain_abci_last_block_height", "Last block height from ABCI info"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(blockchain_abci_last_block_height.clone()))?;
+
+        // ========== 执行指标 - 计算指标（执行性能） ==========
+
+        // 实际 TPS
+        let execution_actual_tps = GaugeVec::new(
+            Opts::new("aiw3_execution_actual_tps", "Actual transactions per second (calculated)"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(execution_actual_tps.clone()))?;
+
+        // 加速比
+        let execution_speedup = GaugeVec::new(
+            Opts::new(
+                "aiw3_execution_speedup",
+                "Execution speedup factor compared to baseline (actual_tps / baseline_tps)",
+            ),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(execution_speedup.clone()))?;
+
+        // 并行执行率
+        let execution_parallelism_rate = GaugeVec::new(
+            Opts::new("aiw3_execution_parallelism_rate", "Estimated parallelism rate percentage"),
+            &["node", "environment"],
+        )?;
+        registry.register(Box::new(execution_parallelism_rate.clone()))?;
+
+        // ========== 网络配置目标指标（静态配置） ==========
+
+        // P2P 发送速率目标
+        let network_target_send_rate = GaugeVec::new(
+            Opts::new(
+                "aiw3_network_target_send_rate_bytes_per_second",
+                "Target P2P send rate in bytes per second",
+            ),
+            &["chain_id"],
+        )?;
+        registry.register(Box::new(network_target_send_rate.clone()))?;
+
+        // P2P 接收速率目标
+        let network_target_recv_rate = GaugeVec::new(
+            Opts::new(
+                "aiw3_network_target_recv_rate_bytes_per_second",
+                "Target P2P receive rate in bytes per second",
+            ),
+            &["chain_id"],
+        )?;
+        registry.register(Box::new(network_target_recv_rate.clone()))?;
+
+        // 最大入站对等节点数目标
+        let network_target_max_inbound_peers = GaugeVec::new(
+            Opts::new(
+                "aiw3_network_target_max_inbound_peers",
+                "Target maximum inbound peer connections",
+            ),
+            &["chain_id"],
+        )?;
+        registry.register(Box::new(network_target_max_inbound_peers.clone()))?;
+
+        // 最大出站对等节点数目标
+        let network_target_max_outbound_peers = GaugeVec::new(
+            Opts::new(
+                "aiw3_network_target_max_outbound_peers",
+                "Target maximum outbound peer connections",
+            ),
+            &["chain_id"],
+        )?;
+        registry.register(Box::new(network_target_max_outbound_peers.clone()))?;
+
+        // Optimistic Execution 启用状态
+        let blockchain_optimistic_execution_enabled = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_optimistic_execution_enabled",
+                "Whether Optimistic Execution (ABCI++) is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_optimistic_execution_enabled.clone()))?;
+
+        // Large Block Size 启用状态
+        let blockchain_large_blocks_enabled = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_large_blocks_enabled",
+                "Whether Large Block Size is enabled (1=enabled, 0=disabled)",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_large_blocks_enabled.clone()))?;
+
+        // Large Block Size 最大大小
+        let blockchain_large_blocks_max_size_mb = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_large_blocks_max_size_mb",
+                "Maximum block size in MB",
+            ),
+            &["node", "environment", "chain_id"],
+        )?;
+        registry.register(Box::new(blockchain_large_blocks_max_size_mb.clone()))?;
+
+        // 优化特性统一摘要
+        let blockchain_optimization_features_info = GaugeVec::new(
+            Opts::new(
+                "aiw3_blockchain_optimization_features_info",
+                "Optimization features summary (1=info available)",
+            ),
+            &["node", "environment", "chain_id", "block_stm", "memiavl", "optimistic_execution", "large_blocks", "zero_copy"],
+        )?;
+        registry.register(Box::new(blockchain_optimization_features_info.clone()))?;
+
+        info!("Prometheus metrics registry initialized with 72 metrics (8 blockchain + 8 resource + 6 optimization + 4 TPS + 3 mempool + 4 validator + 4 network + 5 block_time + 1 api_latency + 1 sync_status + 14 storage_config + 2 abci_info + 3 execution_performance + 4 network_targets + 4 optimization_features)");
 
         Ok(Self {
             registry,
@@ -455,95 +771,165 @@ impl MetricsRegistry {
             validator_online,
             validator_total_voting_power,
             validator_average_voting_power,
+            consensus_height,
+            consensus_round,
+            consensus_step,
             network_inbound_peers,
             network_outbound_peers,
             network_total_peers,
             network_listening_addresses,
+            chain_block_time_current,
+            chain_block_time_average,
+            chain_block_time_min,
+            chain_block_time_max,
+            chain_block_time_std_dev,
+            api_latency_ms,
+            blockchain_block_stm_enabled,
+            blockchain_block_stm_workers,
+            blockchain_block_stm_pre_estimation,
+            blockchain_memiavl_enabled,
+            blockchain_memiavl_cache_size,
+            blockchain_memiavl_zero_copy,
+            blockchain_memiavl_async_commit_buffer,
+            blockchain_memiavl_snapshot_interval,
+            blockchain_memiavl_target_cache_hit_rate,
+            blockchain_memiavl_target_commit_latency_ms,
+            blockchain_memiavl_performance_gain,
+            blockchain_iavl_cache_size,
+            blockchain_iavl_inter_block_cache,
+            blockchain_database_info,
+            blockchain_app_version_info,
+            blockchain_abci_last_block_height,
+            execution_actual_tps,
+            execution_speedup,
+            execution_parallelism_rate,
+            network_target_send_rate,
+            network_target_recv_rate,
+            network_target_max_inbound_peers,
+            network_target_max_outbound_peers,
+            blockchain_optimistic_execution_enabled,
+            blockchain_large_blocks_enabled,
+            blockchain_large_blocks_max_size_mb,
+            blockchain_optimization_features_info,
         })
     }
 
     /// 更新区块高度
     pub fn set_block_height(&self, node: &str, environment: &str, chain_id: &str, value: f64) {
-        self.block_height
-            .with_label_values(&[node, environment, chain_id])
-            .set(value);
+        self.block_height.with_label_values(&[node, environment, chain_id]).set(value);
     }
 
     /// 更新节点数量
     pub fn set_node_count(&self, node: &str, environment: &str, value: f64) {
-        self.node_count
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.node_count.with_label_values(&[node, environment]).set(value);
     }
 
     /// 更新交易池大小
     pub fn set_tx_pool_size(&self, node: &str, environment: &str, value: f64) {
-        self.tx_pool_size
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.tx_pool_size.with_label_values(&[node, environment]).set(value);
     }
 
     /// 更新同步状态
     pub fn set_sync_status(&self, node: &str, environment: &str, catching_up: bool) {
         let value = if catching_up { 0.0 } else { 1.0 };
-        self.sync_status
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.sync_status.with_label_values(&[node, environment]).set(value);
     }
 
     // ========== 资源指标 Setters ==========
 
     /// 更新容器 CPU 使用率
-    pub fn set_container_cpu_percent(&self, container: &str, node: &str, environment: &str, value: f64) {
-        self.container_cpu_percent
-            .with_label_values(&[container, node, environment])
-            .set(value);
+    pub fn set_container_cpu_percent(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
+        self.container_cpu_percent.with_label_values(&[container, node, environment]).set(value);
     }
 
     /// 更新容器内存使用量
-    pub fn set_container_memory_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
-        self.container_memory_bytes
-            .with_label_values(&[container, node, environment])
-            .set(value);
+    pub fn set_container_memory_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
+        self.container_memory_bytes.with_label_values(&[container, node, environment]).set(value);
     }
 
     /// 更新容器内存限制
-    pub fn set_container_memory_limit_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
+    pub fn set_container_memory_limit_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
         self.container_memory_limit_bytes
             .with_label_values(&[container, node, environment])
             .set(value);
     }
 
     /// 更新容器内存使用率
-    pub fn set_container_memory_percent(&self, container: &str, node: &str, environment: &str, value: f64) {
-        self.container_memory_percent
-            .with_label_values(&[container, node, environment])
-            .set(value);
+    pub fn set_container_memory_percent(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
+        self.container_memory_percent.with_label_values(&[container, node, environment]).set(value);
     }
 
     /// 更新容器网络接收字节数
-    pub fn set_container_network_rx_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
+    pub fn set_container_network_rx_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
         self.container_network_rx_bytes
             .with_label_values(&[container, node, environment])
             .set(value);
     }
 
     /// 更新容器网络发送字节数
-    pub fn set_container_network_tx_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
+    pub fn set_container_network_tx_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
         self.container_network_tx_bytes
             .with_label_values(&[container, node, environment])
             .set(value);
     }
 
     /// 更新容器磁盘读取字节数
-    pub fn set_container_block_read_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
+    pub fn set_container_block_read_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
         self.container_block_read_bytes
             .with_label_values(&[container, node, environment])
             .set(value);
     }
 
     /// 更新容器磁盘写入字节数
-    pub fn set_container_block_write_bytes(&self, container: &str, node: &str, environment: &str, value: f64) {
+    pub fn set_container_block_write_bytes(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        value: f64,
+    ) {
         self.container_block_write_bytes
             .with_label_values(&[container, node, environment])
             .set(value);
@@ -556,53 +942,129 @@ impl MetricsRegistry {
         node: &str,
         environment: &str,
     ) {
-        self.set_container_cpu_percent(&metrics.container_name, node, environment, metrics.cpu_percent);
-        self.set_container_memory_bytes(&metrics.container_name, node, environment, metrics.memory_bytes as f64);
-        self.set_container_memory_limit_bytes(&metrics.container_name, node, environment, metrics.memory_limit_bytes as f64);
-        self.set_container_memory_percent(&metrics.container_name, node, environment, metrics.memory_percent);
-        self.set_container_network_rx_bytes(&metrics.container_name, node, environment, metrics.network_rx_bytes as f64);
-        self.set_container_network_tx_bytes(&metrics.container_name, node, environment, metrics.network_tx_bytes as f64);
-        self.set_container_block_read_bytes(&metrics.container_name, node, environment, metrics.block_read_bytes as f64);
-        self.set_container_block_write_bytes(&metrics.container_name, node, environment, metrics.block_write_bytes as f64);
+        self.set_container_cpu_percent(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.cpu_percent,
+        );
+        self.set_container_memory_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.memory_bytes as f64,
+        );
+        self.set_container_memory_limit_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.memory_limit_bytes as f64,
+        );
+        self.set_container_memory_percent(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.memory_percent,
+        );
+        self.set_container_network_rx_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.network_rx_bytes as f64,
+        );
+        self.set_container_network_tx_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.network_tx_bytes as f64,
+        );
+        self.set_container_block_read_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.block_read_bytes as f64,
+        );
+        self.set_container_block_write_bytes(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.block_write_bytes as f64,
+        );
     }
 
     /// 更新 Block-STM 启用状态
-    pub fn set_optimization_block_stm_enabled(&self, container: &str, node: &str, environment: &str, enabled: bool) {
+    pub fn set_optimization_block_stm_enabled(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        enabled: bool,
+    ) {
         self.optimization_block_stm_enabled
             .with_label_values(&[container, node, environment])
             .set(if enabled { 1.0 } else { 0.0 });
     }
 
     /// 更新 Block-STM 工作线程数
-    pub fn set_optimization_block_stm_workers(&self, container: &str, node: &str, environment: &str, workers: i32) {
+    pub fn set_optimization_block_stm_workers(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        workers: i32,
+    ) {
         self.optimization_block_stm_workers
             .with_label_values(&[container, node, environment])
             .set(workers as f64);
     }
 
     /// 更新 MemIAVL 启用状态
-    pub fn set_optimization_memiavl_enabled(&self, container: &str, node: &str, environment: &str, enabled: bool) {
+    pub fn set_optimization_memiavl_enabled(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        enabled: bool,
+    ) {
         self.optimization_memiavl_enabled
             .with_label_values(&[container, node, environment])
             .set(if enabled { 1.0 } else { 0.0 });
     }
 
     /// 更新 MemIAVL 缓存大小
-    pub fn set_optimization_memiavl_cache_size(&self, container: &str, node: &str, environment: &str, cache_size: i64) {
+    pub fn set_optimization_memiavl_cache_size(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        cache_size: i64,
+    ) {
         self.optimization_memiavl_cache_size
             .with_label_values(&[container, node, environment])
             .set(cache_size as f64);
     }
 
     /// 更新 MemIAVL 快照间隔
-    pub fn set_optimization_memiavl_snapshot_interval(&self, container: &str, node: &str, environment: &str, interval: i32) {
+    pub fn set_optimization_memiavl_snapshot_interval(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        interval: i32,
+    ) {
         self.optimization_memiavl_snapshot_interval
             .with_label_values(&[container, node, environment])
             .set(interval as f64);
     }
 
     /// 更新 Zero-Copy 启用状态
-    pub fn set_optimization_zero_copy_enabled(&self, container: &str, node: &str, environment: &str, enabled: bool) {
+    pub fn set_optimization_zero_copy_enabled(
+        &self,
+        container: &str,
+        node: &str,
+        environment: &str,
+        enabled: bool,
+    ) {
         self.optimization_zero_copy_enabled
             .with_label_values(&[container, node, environment])
             .set(if enabled { 1.0 } else { 0.0 });
@@ -615,46 +1077,68 @@ impl MetricsRegistry {
         node: &str,
         environment: &str,
     ) {
-        self.set_optimization_block_stm_enabled(&metrics.container_name, node, environment, metrics.block_stm_enabled);
+        self.set_optimization_block_stm_enabled(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.block_stm_enabled,
+        );
         if let Some(workers) = metrics.block_stm_workers {
-            self.set_optimization_block_stm_workers(&metrics.container_name, node, environment, workers);
+            self.set_optimization_block_stm_workers(
+                &metrics.container_name,
+                node,
+                environment,
+                workers,
+            );
         }
-        self.set_optimization_memiavl_enabled(&metrics.container_name, node, environment, metrics.memiavl_enabled);
+        self.set_optimization_memiavl_enabled(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.memiavl_enabled,
+        );
         if let Some(cache_size) = metrics.memiavl_cache_size {
-            self.set_optimization_memiavl_cache_size(&metrics.container_name, node, environment, cache_size);
+            self.set_optimization_memiavl_cache_size(
+                &metrics.container_name,
+                node,
+                environment,
+                cache_size,
+            );
         }
         if let Some(interval) = metrics.memiavl_snapshot_interval {
-            self.set_optimization_memiavl_snapshot_interval(&metrics.container_name, node, environment, interval);
+            self.set_optimization_memiavl_snapshot_interval(
+                &metrics.container_name,
+                node,
+                environment,
+                interval,
+            );
         }
-        self.set_optimization_zero_copy_enabled(&metrics.container_name, node, environment, metrics.zero_copy_enabled);
+        self.set_optimization_zero_copy_enabled(
+            &metrics.container_name,
+            node,
+            environment,
+            metrics.zero_copy_enabled,
+        );
     }
 
     /// 更新当前 TPS
     pub fn set_tps_current(&self, node: &str, environment: &str, value: f64) {
-        self.chain_tps_current
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.chain_tps_current.with_label_values(&[node, environment]).set(value);
     }
 
     /// 更新平均 TPS
     pub fn set_tps_average(&self, node: &str, environment: &str, value: f64) {
-        self.chain_tps_average
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.chain_tps_average.with_label_values(&[node, environment]).set(value);
     }
 
     /// 更新峰值 TPS
     pub fn set_tps_peak(&self, node: &str, environment: &str, value: f64) {
-        self.chain_tps_peak
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.chain_tps_peak.with_label_values(&[node, environment]).set(value);
     }
 
     /// 更新总交易数
     pub fn set_total_transactions(&self, node: &str, environment: &str, value: f64) {
-        self.chain_total_transactions
-            .with_label_values(&[node, environment])
-            .set(value);
+        self.chain_total_transactions.with_label_values(&[node, environment]).set(value);
     }
 
     /// 批量更新 TPS 指标（从 TpsMetrics）
@@ -730,6 +1214,242 @@ impl MetricsRegistry {
             .set(metrics.listening_addresses as f64);
     }
 
+    /// 批量更新共识状态指标
+    pub fn set_consensus_metrics(&self, metrics: &ConsensusMetrics, node: &str, environment: &str) {
+        self.consensus_height.with_label_values(&[node, environment]).set(metrics.height as f64);
+        self.consensus_round.with_label_values(&[node, environment]).set(metrics.round as f64);
+        self.consensus_step.with_label_values(&[node, environment]).set(metrics.step as f64);
+    }
+
+    /// 批量更新延迟指标（从 LatencyMetrics）
+    pub fn set_latency_metrics(
+        &self,
+        metrics: &crate::collectors::LatencyMetrics,
+        node: &str,
+        environment: &str,
+    ) {
+        self.chain_block_time_current
+            .with_label_values(&[node, environment])
+            .set(metrics.current_block_time);
+        self.chain_block_time_average
+            .with_label_values(&[node, environment])
+            .set(metrics.average_block_time);
+        self.chain_block_time_min
+            .with_label_values(&[node, environment])
+            .set(metrics.min_block_time);
+        self.chain_block_time_max
+            .with_label_values(&[node, environment])
+            .set(metrics.max_block_time);
+        self.chain_block_time_std_dev
+            .with_label_values(&[node, environment])
+            .set(metrics.std_deviation);
+    }
+
+    /// 更新 API 延迟指标
+    pub fn set_api_latency(&self, node: &str, environment: &str, endpoint: &str, latency_ms: f64) {
+        self.api_latency_ms.with_label_values(&[node, environment, endpoint]).set(latency_ms);
+    }
+
+    /// 批量设置区块链静态配置指标（从 BlockchainConfig）
+    pub fn set_blockchain_static_config(
+        &self,
+        config: &crate::config::BlockchainConfig,
+        node: &str,
+        environment: &str,
+        chain_id: &str,
+    ) {
+        // Block-STM 配置
+        self.blockchain_block_stm_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.execution_metrics.block_stm.enabled { 1.0 } else { 0.0 });
+
+        self.blockchain_block_stm_workers
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.execution_metrics.block_stm.workers as f64);
+
+        self.blockchain_block_stm_pre_estimation
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.execution_metrics.block_stm.pre_estimation { 1.0 } else { 0.0 });
+
+        // MemIAVL 配置
+        self.blockchain_memiavl_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.storage_metrics.memiavl.enabled { 1.0 } else { 0.0 });
+
+        self.blockchain_memiavl_cache_size
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.cache_size_nodes as f64);
+
+        self.blockchain_memiavl_zero_copy
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.storage_metrics.memiavl.zero_copy { 1.0 } else { 0.0 });
+
+        self.blockchain_memiavl_async_commit_buffer
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.async_commit_buffer as f64);
+
+        self.blockchain_memiavl_snapshot_interval
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.snapshot_interval_blocks as f64);
+
+        self.blockchain_memiavl_target_cache_hit_rate
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.cache_hit_rate_percentage as f64);
+
+        self.blockchain_memiavl_target_commit_latency_ms
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.commit_latency_ms as f64);
+
+        self.blockchain_memiavl_performance_gain
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.memiavl.performance_gain as f64);
+
+        // IAVL 配置
+        self.blockchain_iavl_cache_size
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.storage_metrics.iavl.cache_size_nodes as f64);
+
+        self.blockchain_iavl_inter_block_cache
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.storage_metrics.iavl.inter_block_cache { 1.0 } else { 0.0 });
+
+        // 数据库配置（使用 label 存储字符串值）
+        self.blockchain_database_info
+            .with_label_values(&[
+                node,
+                environment,
+                chain_id,
+                &config.storage_metrics.database.backend,
+                &config.storage_metrics.database.pruning_strategy_devnet,
+                &config.storage_metrics.database.pruning_strategy_production,
+            ])
+            .set(1.0);
+
+        // Optimistic Execution 配置
+        self.blockchain_optimistic_execution_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.is_optimistic_execution_enabled() { 1.0 } else { 0.0 });
+
+        // Large Block Size 配置
+        self.blockchain_large_blocks_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if config.is_large_blocks_enabled() { 1.0 } else { 0.0 });
+
+        self.blockchain_large_blocks_max_size_mb
+            .with_label_values(&[node, environment, chain_id])
+            .set(config.max_block_size_mb() as f64);
+
+        // 统一优化特性摘要
+        self.blockchain_optimization_features_info
+            .with_label_values(&[
+                node,
+                environment,
+                chain_id,
+                if config.execution_metrics.block_stm.enabled { "enabled" } else { "disabled" },
+                if config.storage_metrics.memiavl.enabled { "enabled" } else { "disabled" },
+                if config.is_optimistic_execution_enabled() { "enabled" } else { "disabled" },
+                if config.is_large_blocks_enabled() { "enabled" } else { "disabled" },
+                if config.is_zero_copy_enabled() { "enabled" } else { "disabled" },
+            ])
+            .set(1.0);
+    }
+
+    /// 设置 ABCI 信息指标（从 AbciInfoResult）
+    pub fn set_abci_info(
+        &self,
+        abci_info: &crate::collectors::models::AbciInfoResult,
+        node: &str,
+        environment: &str,
+    ) {
+        // 应用版本信息（使用标签存储版本字符串）
+        self.blockchain_app_version_info
+            .with_label_values(&[node, environment, abci_info.version()])
+            .set(1.0);
+
+        // 最后区块高度
+        if let Ok(height) = abci_info.last_block_height() {
+            self.blockchain_abci_last_block_height
+                .with_label_values(&[node, environment])
+                .set(height as f64);
+        }
+    }
+
+    /// 设置执行性能指标（从 ExecutionPerformance）
+    pub fn set_execution_performance(
+        &self,
+        performance: &crate::collectors::ExecutionPerformance,
+        node: &str,
+        environment: &str,
+    ) {
+        self.execution_actual_tps
+            .with_label_values(&[node, environment])
+            .set(performance.actual_tps);
+
+        self.execution_speedup.with_label_values(&[node, environment]).set(performance.speedup);
+
+        self.execution_parallelism_rate
+            .with_label_values(&[node, environment])
+            .set(performance.estimated_parallelism_rate);
+    }
+
+    /// 设置网络配置目标指标（启动时调用一次）
+    pub fn set_network_target_config(&self, p2p_config: &crate::config::P2pConfig, chain_id: &str) {
+        self.network_target_send_rate
+            .with_label_values(&[chain_id])
+            .set(p2p_config.send_rate_bytes_per_second as f64);
+
+        self.network_target_recv_rate
+            .with_label_values(&[chain_id])
+            .set(p2p_config.recv_rate_bytes_per_second as f64);
+
+        self.network_target_max_inbound_peers
+            .with_label_values(&[chain_id])
+            .set(p2p_config.max_inbound_peers as f64);
+
+        self.network_target_max_outbound_peers
+            .with_label_values(&[chain_id])
+            .set(p2p_config.max_outbound_peers as f64);
+    }
+
+    /// 更新 Optimistic Execution 启用状态
+    pub fn set_optimization_optimistic_execution_enabled(
+        &self,
+        node: &str,
+        environment: &str,
+        chain_id: &str,
+        enabled: bool,
+    ) {
+        self.blockchain_optimistic_execution_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if enabled { 1.0 } else { 0.0 });
+    }
+
+    /// 更新 Large Blocks 启用状态
+    pub fn set_optimization_large_blocks_enabled(
+        &self,
+        node: &str,
+        environment: &str,
+        chain_id: &str,
+        enabled: bool,
+    ) {
+        self.blockchain_large_blocks_enabled
+            .with_label_values(&[node, environment, chain_id])
+            .set(if enabled { 1.0 } else { 0.0 });
+    }
+
+    /// 更新 Large Blocks 最大大小
+    pub fn set_optimization_large_blocks_max_size(
+        &self,
+        node: &str,
+        environment: &str,
+        chain_id: &str,
+        max_size_mb: u64,
+    ) {
+        self.blockchain_large_blocks_max_size_mb
+            .with_label_values(&[node, environment, chain_id])
+            .set(max_size_mb as f64);
+    }
+
     /// 导出指标为 Prometheus 文本格式
     pub fn export(&self) -> Result<String> {
         let encoder = TextEncoder::new();
@@ -774,15 +1494,15 @@ mod tests {
     #[test]
     fn test_all_metric_setters() {
         let registry = MetricsRegistry::new().unwrap();
-        
+
         // 测试所有 setter 方法
         registry.set_block_height("node1", "prod", "chain1", 1000.0);
         registry.set_node_count("node1", "prod", 5.0);
         registry.set_tx_pool_size("node1", "prod", 10.0);
         registry.set_sync_status("node1", "prod", false);
-        
+
         let output = registry.export().unwrap();
-        
+
         assert!(output.contains("1000"));
         assert!(output.contains("5"));
         assert!(output.contains("10"));
@@ -791,11 +1511,11 @@ mod tests {
     #[test]
     fn test_export_format_compliance() {
         let registry = MetricsRegistry::new().unwrap();
-        
+
         registry.set_block_height("test", "test", "test", 100.0);
-        
+
         let output = registry.export().unwrap();
-        
+
         // 验证 Prometheus 格式
         assert!(output.contains("# HELP"));
         assert!(output.contains("# TYPE"));
@@ -805,14 +1525,14 @@ mod tests {
     #[test]
     fn test_multiple_nodes() {
         let registry = MetricsRegistry::new().unwrap();
-        
+
         // 为多个节点设置指标
         registry.set_block_height("node1", "prod", "chain1", 1000.0);
         registry.set_block_height("node2", "prod", "chain1", 2000.0);
         registry.set_block_height("node3", "dev", "chain2", 500.0);
-        
+
         let output = registry.export().unwrap();
-        
+
         // 验证所有节点的数据都存在
         assert!(output.contains("node=\"node1\""));
         assert!(output.contains("node=\"node2\""));
@@ -825,25 +1545,25 @@ mod tests {
     fn test_clone_works() {
         let registry = MetricsRegistry::new().unwrap();
         registry.set_block_height("test", "test", "test", 100.0);
-        
+
         let cloned = registry.clone();
-        
+
         // 克隆后的注册器应该能导出相同的数据
         let output1 = registry.export().unwrap();
         let output2 = cloned.export().unwrap();
-        
+
         assert_eq!(output1, output2);
     }
 
     #[test]
     fn test_metric_update() {
         let registry = MetricsRegistry::new().unwrap();
-        
+
         // 第一次设置
         registry.set_block_height("test", "test", "test", 100.0);
         let output1 = registry.export().unwrap();
         assert!(output1.contains("100"));
-        
+
         // 更新值
         registry.set_block_height("test", "test", "test", 200.0);
         let output2 = registry.export().unwrap();

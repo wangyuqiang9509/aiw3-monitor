@@ -4,4 +4,3 @@ pub mod stats;
 
 pub use logs::{DockerLogsCollector, OptimizationMetrics};
 pub use stats::{DockerStatsCollector, ResourceMetrics};
-

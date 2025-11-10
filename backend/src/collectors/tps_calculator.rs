@@ -41,7 +41,7 @@ pub struct TpsMetrics {
 
 impl TpsCalculator {
     /// 创建新的 TPS 计算器
-    /// 
+    ///
     /// # 参数
     /// * `window_size` - 时间窗口大小（秒），默认 60 秒
     pub fn new(window_size: u64) -> Self {
@@ -53,16 +53,12 @@ impl TpsCalculator {
     }
 
     /// 添加新的区块记录
-    /// 
+    ///
     /// # 参数
     /// * `height` - 区块高度
     /// * `tx_count` - 交易数量
     pub fn add_block(&mut self, height: u64, tx_count: u64) {
-        let record = BlockRecord {
-            height,
-            timestamp: SystemTime::now(),
-            tx_count,
-        };
+        let record = BlockRecord { height, timestamp: SystemTime::now(), tx_count };
 
         self.block_history.push_back(record);
 
@@ -114,14 +110,9 @@ impl TpsCalculator {
 
         // 计算实际时间跨度
         let actual_duration = if block_count > 0 {
-            let oldest_in_window = self
-                .block_history
-                .iter()
-                .rev()
-                .take(block_count)
-                .last()
-                .unwrap();
-            
+            let oldest_in_window =
+                self.block_history.iter().rev().take(block_count).last().unwrap();
+
             now.duration_since(oldest_in_window.timestamp)
                 .unwrap_or(Duration::from_secs(1))
                 .as_secs_f64()
@@ -130,18 +121,12 @@ impl TpsCalculator {
         };
 
         // 计算 TPS
-        let current_tps = if actual_duration > 0.0 {
-            total_tx as f64 / actual_duration
-        } else {
-            0.0
-        };
+        let current_tps =
+            if actual_duration > 0.0 { total_tx as f64 / actual_duration } else { 0.0 };
 
         // 计算平均每区块交易数
-        let avg_tx_per_block = if block_count > 0 {
-            total_tx as f64 / block_count as f64
-        } else {
-            0.0
-        };
+        let avg_tx_per_block =
+            if block_count > 0 { total_tx as f64 / block_count as f64 } else { 0.0 };
 
         // 估算平均区块时间
         let avg_block_time = if block_count > 1 {
@@ -151,18 +136,12 @@ impl TpsCalculator {
         };
 
         // 计算平均 TPS
-        let average_tps = if avg_block_time > 0.0 {
-            avg_tx_per_block / avg_block_time
-        } else {
-            0.0
-        };
+        let average_tps =
+            if avg_block_time > 0.0 { avg_tx_per_block / avg_block_time } else { 0.0 };
 
         // 计算峰值 TPS（基于单个区块的最大交易数）
-        let peak_tps = if avg_block_time > 0.0 {
-            max_block_tx as f64 / avg_block_time
-        } else {
-            0.0
-        };
+        let peak_tps =
+            if avg_block_time > 0.0 { max_block_tx as f64 / avg_block_time } else { 0.0 };
 
         TpsMetrics {
             current_tps,
@@ -212,10 +191,10 @@ mod tests {
     #[test]
     fn test_add_block() {
         let mut calculator = TpsCalculator::new(60);
-        
+
         calculator.add_block(100, 50);
         assert_eq!(calculator.history_size(), 1);
-        
+
         calculator.add_block(101, 60);
         assert_eq!(calculator.history_size(), 2);
     }
@@ -224,7 +203,7 @@ mod tests {
     fn test_calculate_tps_empty() {
         let calculator = TpsCalculator::new(60);
         let metrics = calculator.calculate_tps();
-        
+
         assert_eq!(metrics.current_tps, 0.0);
         assert_eq!(metrics.total_transactions, 0);
     }
@@ -233,7 +212,7 @@ mod tests {
     fn test_calculate_tps_single_block() {
         let mut calculator = TpsCalculator::new(60);
         calculator.add_block(100, 100);
-        
+
         let metrics = calculator.calculate_tps();
         assert!(metrics.current_tps > 0.0);
         assert_eq!(metrics.total_transactions, 100);
@@ -242,13 +221,13 @@ mod tests {
     #[test]
     fn test_calculate_tps_multiple_blocks() {
         let mut calculator = TpsCalculator::new(60);
-        
+
         // 添加多个区块
         for i in 0..10 {
             calculator.add_block(100 + i, 50);
             thread::sleep(Duration::from_millis(100));
         }
-        
+
         let metrics = calculator.calculate_tps();
         assert!(metrics.current_tps > 0.0);
         assert_eq!(metrics.total_transactions, 500);
@@ -258,14 +237,14 @@ mod tests {
     #[test]
     fn test_cleanup_old_records() {
         let mut calculator = TpsCalculator::new(1); // 1 秒窗口
-        
+
         calculator.add_block(100, 50);
         thread::sleep(Duration::from_secs(2));
         calculator.add_block(101, 60);
-        
+
         // 触发清理
         calculator.cleanup_old_records();
-        
+
         // 应该只保留最新的记录
         assert!(calculator.history_size() <= 2);
     }
@@ -273,11 +252,11 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut calculator = TpsCalculator::new(60);
-        
+
         calculator.add_block(100, 50);
         calculator.add_block(101, 60);
         assert_eq!(calculator.history_size(), 2);
-        
+
         calculator.clear();
         assert_eq!(calculator.history_size(), 0);
     }
@@ -286,14 +265,13 @@ mod tests {
     fn test_max_history_limit() {
         let mut calculator = TpsCalculator::new(60);
         calculator.max_history = 10; // 设置较小的限制用于测试
-        
+
         // 添加超过限制的区块
         for i in 0..20 {
             calculator.add_block(100 + i, 50);
         }
-        
+
         // 应该不超过最大限制
         assert!(calculator.history_size() <= 10);
     }
 }
-

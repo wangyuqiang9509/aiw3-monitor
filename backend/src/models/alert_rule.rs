@@ -136,24 +136,24 @@ impl AlertRule {
     pub fn new(
         name: String,
         node_id: Option<i32>,
-        metric_type: String,  // ✅ 修改参数名
+        metric_type: String, // ✅ 修改参数名
         condition_type: ConditionType,
         severity: Severity,
-        notification_channels: Vec<String>,  // ✅ 修改参数名
+        notification_channels: Vec<String>, // ✅ 修改参数名
     ) -> Self {
         Self {
             id: 0,
             name,
             description: None,
             node_id,
-            metric_type,  // ✅ 使用新字段名
+            metric_type, // ✅ 使用新字段名
             condition_type: condition_type.as_str().to_string(),
             threshold_value: None,
-            time_window_seconds: 300,  // ✅ 默认5分钟
+            time_window_seconds: 300, // ✅ 默认5分钟
             severity: severity.as_str().to_string(),
             enabled: true,
             silence_period_seconds: 1800, // 默认30分钟
-            notification_channels: sqlx::types::Json(notification_channels),  // ✅ 使用新字段名
+            notification_channels: sqlx::types::Json(notification_channels), // ✅ 使用新字段名
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -167,7 +167,7 @@ impl AlertRule {
 
     /// 设置时间窗口
     pub fn with_time_window(mut self, seconds: i32) -> Self {
-        self.time_window_seconds = seconds;  // ✅ 使用新字段名
+        self.time_window_seconds = seconds; // ✅ 使用新字段名
         self
     }
 
@@ -194,14 +194,8 @@ mod tests {
         assert_eq!(ConditionType::TimeWindow.as_str(), "time_window");
         assert_eq!(ConditionType::RateOfChange.as_str(), "rate_of_change");
 
-        assert_eq!(
-            ConditionType::from_str("threshold"),
-            Some(ConditionType::Threshold)
-        );
-        assert_eq!(
-            ConditionType::from_str("time_window"),
-            Some(ConditionType::TimeWindow)
-        );
+        assert_eq!(ConditionType::from_str("threshold"), Some(ConditionType::Threshold));
+        assert_eq!(ConditionType::from_str("time_window"), Some(ConditionType::TimeWindow));
         assert_eq!(ConditionType::from_str("invalid"), None);
     }
 
@@ -241,25 +235,25 @@ mod tests {
         let rule = AlertRule::new(
             "Test Rule".to_string(),
             Some(1),
-            "blockheight".to_string(),  // ✅ 使用 metric_type
+            "blockheight".to_string(), // ✅ 使用 metric_type
             ConditionType::Threshold,
             Severity::Critical,
-            vec!["email".to_string()],  // ✅ 使用 notification_channels
+            vec!["email".to_string()], // ✅ 使用 notification_channels
         )
-        .with_threshold(100000.0)  // ✅ 移除 comparison_operator
-        .with_time_window(600)  // ✅ 使用新方法名
+        .with_threshold(100000.0) // ✅ 移除 comparison_operator
+        .with_time_window(600) // ✅ 使用新方法名
         .with_silence_period(3600)
         .with_description("Test description".to_string());
 
         assert_eq!(rule.name, "Test Rule");
         assert_eq!(rule.node_id, Some(1));
-        assert_eq!(rule.metric_type, "blockheight");  // ✅ 使用新字段名
+        assert_eq!(rule.metric_type, "blockheight"); // ✅ 使用新字段名
         assert_eq!(rule.condition_type, "threshold");
         assert_eq!(rule.severity, "critical");
         assert_eq!(rule.threshold_value, Some(100000.0));
-        assert_eq!(rule.time_window_seconds, 600);  // ✅ 使用新字段名
+        assert_eq!(rule.time_window_seconds, 600); // ✅ 使用新字段名
         assert_eq!(rule.silence_period_seconds, 3600);
         assert_eq!(rule.description, Some("Test description".to_string()));
-        assert_eq!(rule.notification_channels.0, vec!["email".to_string()]);  // ✅ 使用新字段名
+        assert_eq!(rule.notification_channels.0, vec!["email".to_string()]); // ✅ 使用新字段名
     }
 }

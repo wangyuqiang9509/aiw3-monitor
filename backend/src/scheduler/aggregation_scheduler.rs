@@ -21,18 +21,12 @@ impl AggregationScheduler {
     /// - `pool`: 数据库连接池
     /// - `check_interval_seconds`: 检查间隔（秒）
     pub fn new(pool: Arc<PgPool>, check_interval_seconds: u64) -> Self {
-        Self {
-            pool,
-            check_interval: Duration::from_secs(check_interval_seconds),
-        }
+        Self { pool, check_interval: Duration::from_secs(check_interval_seconds) }
     }
 
     /// 启动调度器（持续运行）
     pub async fn start(&self) {
-        info!(
-            "Starting aggregation scheduler with interval: {:?}",
-            self.check_interval
-        );
+        info!("Starting aggregation scheduler with interval: {:?}", self.check_interval);
 
         let mut ticker = interval(self.check_interval);
 
@@ -95,7 +89,7 @@ impl AggregationScheduler {
     /// 手动刷新天级聚合视图
     async fn refresh_daily_metrics(&self) -> Result<()> {
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM daily_metrics WHERE day_date >= NOW() - INTERVAL '7 days'"
+            "SELECT COUNT(*) FROM daily_metrics WHERE day_date >= NOW() - INTERVAL '7 days'",
         )
         .fetch_one(self.pool.as_ref())
         .await?;
@@ -107,7 +101,7 @@ impl AggregationScheduler {
     /// 手动刷新月级聚合视图
     async fn refresh_monthly_metrics(&self) -> Result<()> {
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM monthly_metrics WHERE month_start >= NOW() - INTERVAL '1 year'"
+            "SELECT COUNT(*) FROM monthly_metrics WHERE month_start >= NOW() - INTERVAL '1 year'",
         )
         .fetch_one(self.pool.as_ref())
         .await?;
@@ -130,11 +124,7 @@ impl AggregationScheduler {
             .fetch_one(self.pool.as_ref())
             .await?;
 
-        Ok(AggregationStats {
-            hourly_count,
-            daily_count,
-            monthly_count,
-        })
+        Ok(AggregationStats { hourly_count, daily_count, monthly_count })
     }
 
     /// 验证聚合策略是否正常工作
@@ -147,7 +137,7 @@ impl AggregationScheduler {
                 config::text as status
             FROM timescaledb_information.continuous_aggregates
             WHERE view_name IN ('hourly_metrics', 'daily_metrics', 'monthly_metrics')
-            "#
+            "#,
         )
         .fetch_all(self.pool.as_ref())
         .await?;
@@ -195,15 +185,10 @@ mod tests {
 
     #[test]
     fn test_aggregation_stats() {
-        let stats = AggregationStats {
-            hourly_count: 100,
-            daily_count: 50,
-            monthly_count: 10,
-        };
+        let stats = AggregationStats { hourly_count: 100, daily_count: 50, monthly_count: 10 };
 
         assert_eq!(stats.hourly_count, 100);
         assert_eq!(stats.daily_count, 50);
         assert_eq!(stats.monthly_count, 10);
     }
 }
-

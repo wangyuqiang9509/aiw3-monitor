@@ -132,6 +132,73 @@ pub struct NumUnconfirmedTxsResult {
     pub total_bytes: String,
 }
 
+/// Block 响应 (来自 /block 端点)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockResult {
+    pub block_id: BlockId,
+    pub block: Block,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockId {
+    pub hash: String,
+    pub parts: BlockParts,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockParts {
+    pub total: u32,
+    pub hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Block {
+    pub header: BlockHeader,
+    pub data: BlockData,
+    pub evidence: Evidence,
+    pub last_commit: Option<LastCommit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockHeader {
+    pub version: BlockVersion,
+    pub chain_id: String,
+    pub height: String,
+    pub time: String,
+    // 其他字段可选，根据需要添加
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockVersion {
+    pub block: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockData {
+    pub txs: Vec<String>, // Base64 编码的交易数据
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Evidence {
+    pub evidence: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LastCommit {
+    pub height: String,
+    pub round: u32,
+    pub block_id: BlockId,
+    pub signatures: Vec<Signature>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Signature {
+    pub block_id_flag: u32,
+    pub validator_address: String,
+    pub timestamp: String,
+    pub signature: String,
+}
+
 impl SyncInfo {
     /// 获取区块高度 (u64)
     pub fn block_height(&self) -> Result<u64, std::num::ParseIntError> {
@@ -150,6 +217,161 @@ impl NumUnconfirmedTxsResult {
     /// 获取未确认交易数量 (u64)
     pub fn tx_count(&self) -> Result<u64, std::num::ParseIntError> {
         self.n_txs.parse()
+    }
+}
+
+impl BlockResult {
+    /// 获取区块高度
+    pub fn block_height(&self) -> Result<u64, std::num::ParseIntError> {
+        self.block.header.height.parse()
+    }
+
+    /// 获取交易数量
+    pub fn tx_count(&self) -> u64 {
+        self.block.data.txs.len() as u64
+    }
+
+    /// 获取区块时间
+    pub fn block_time(&self) -> &str {
+        &self.block.header.time
+    }
+
+    /// 获取区块时间戳（返回 Result）
+    pub fn block_timestamp(&self) -> Result<String, ()> {
+        Ok(self.block.header.time.clone())
+    }
+}
+
+/// Validators 响应 (来自 /validators 端点)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidatorsResult {
+    pub block_height: String,
+    pub validators: Vec<Validator>,
+    pub count: String,
+    pub total: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Validator {
+    pub address: String,
+    pub pub_key: PubKey,
+    pub voting_power: String,
+    pub proposer_priority: String,
+}
+
+impl ValidatorsResult {
+    /// 获取验证者总数
+    pub fn total_count(&self) -> Result<u64, std::num::ParseIntError> {
+        self.total.parse()
+    }
+
+    /// 获取活跃验证者数量
+    pub fn active_count(&self) -> Result<u64, std::num::ParseIntError> {
+        self.count.parse()
+    }
+
+    /// 计算总投票权
+    pub fn total_voting_power(&self) -> Result<i64, std::num::ParseIntError> {
+        self.validators.iter().map(|v| v.voting_power.parse::<i64>()).sum()
+    }
+
+    /// 计算平均投票权
+    pub fn average_voting_power(&self) -> Result<f64, std::num::ParseIntError> {
+        let total = self.total_voting_power()?;
+        let count = self.active_count()? as f64;
+        Ok(if count > 0.0 { total as f64 / count } else { 0.0 })
+    }
+}
+
+/// ConsensusState 响应 (来自 /consensus_state 端点)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusStateResult {
+    pub round_state: RoundState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoundState {
+    #[serde(rename = "height/round/step")]
+    pub height_round_step: String, // 格式: "150083/0/4"
+    pub start_time: String,
+    pub proposal_block_hash: String,
+    pub locked_block_hash: String,
+    pub valid_block_hash: String,
+    pub height_vote_set: Vec<serde_json::Value>,
+    pub proposer: Proposer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Proposer {
+    pub address: String,
+    pub index: u32,
+}
+
+impl RoundState {
+    /// 解析高度/轮次/步骤
+    pub fn parse_height_round_step(&self) -> Result<(u64, u32, u32), String> {
+        let parts: Vec<&str> = self.height_round_step.split('/').collect();
+        if parts.len() != 3 {
+            return Err("Invalid height/round/step format".to_string());
+        }
+
+        let height =
+            parts[0].parse::<u64>().map_err(|e| format!("Failed to parse height: {}", e))?;
+        let round = parts[1].parse::<u32>().map_err(|e| format!("Failed to parse round: {}", e))?;
+        let step = parts[2].parse::<u32>().map_err(|e| format!("Failed to parse step: {}", e))?;
+
+        Ok((height, round, step))
+    }
+
+    /// 获取当前高度
+    pub fn height(&self) -> Result<u64, String> {
+        self.parse_height_round_step().map(|(h, _, _)| h)
+    }
+
+    /// 获取当前轮次
+    pub fn round(&self) -> Result<u32, String> {
+        self.parse_height_round_step().map(|(_, r, _)| r)
+    }
+
+    /// 获取当前步骤
+    pub fn step(&self) -> Result<u32, String> {
+        self.parse_height_round_step().map(|(_, _, s)| s)
+    }
+}
+
+/// AbciInfo 响应 (来自 /abci_info 端点)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AbciInfoResult {
+    pub response: AbciResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AbciResponse {
+    pub data: String,
+    pub version: String,
+    pub last_block_height: String,
+    pub last_block_app_hash: String,
+}
+
+impl AbciInfoResult {
+    /// 获取应用版本
+    pub fn version(&self) -> &str {
+        &self.response.version
+    }
+
+    /// 获取最后区块高度
+    pub fn last_block_height(&self) -> Result<u64, std::num::ParseIntError> {
+        self.response.last_block_height.parse()
+    }
+
+    /// 从版本号推断是否启用了 Block-STM
+    pub fn infer_block_stm_enabled(&self) -> bool {
+        self.response.version.to_lowercase().contains("blockstm")
+    }
+
+    /// 从版本号推断是否启用了 MemIAVL
+    pub fn infer_memiavl_enabled(&self) -> bool {
+        self.response.version.to_lowercase().contains("memiavl")
     }
 }
 

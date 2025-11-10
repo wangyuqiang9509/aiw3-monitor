@@ -197,6 +197,97 @@ groups:
         annotations:
           summary: "监听地址丢失 (节点: {{ $labels.node }})"
           description: "节点没有监听任何地址，无法接受入站连接"
+          
+      # 入站连接数超过目标配置
+      - alert: ExcessiveInboundPeers
+        expr: aiw3_network_inbound_peers > aiw3_network_target_max_inbound_peers
+        for: 5m
+        labels:
+          severity: info
+          category: network
+        annotations:
+          summary: "入站连接数超过目标 (节点: {{ $labels.node }})"
+          description: "入站连接数 {{ $value }} 超过目标配置 {{ $labels.target }}"
+          
+      # 出站连接数超过目标配置
+      - alert: ExcessiveOutboundPeers
+        expr: aiw3_network_outbound_peers > aiw3_network_target_max_outbound_peers
+        for: 5m
+        labels:
+          severity: info
+          category: network
+        annotations:
+          summary: "出站连接数超过目标 (节点: {{ $labels.node }})"
+          description: "出站连接数 {{ $value }} 超过目标配置 {{ $labels.target }}"
+          
+      # 没有入站连接
+      - alert: NoInboundPeers
+        expr: aiw3_network_inbound_peers == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "没有入站连接 (节点: {{ $labels.node }})"
+          description: "节点没有任何入站对等节点连接，可能影响网络可见性"
+
+  - name: consensus_state_alerts
+    interval: 30s
+    rules:
+      # 共识停滞
+      - alert: ConsensusStuck
+        expr: rate(aiw3_consensus_height[5m]) == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: consensus
+        annotations:
+          summary: "共识停滞 (节点: {{ $labels.node }})"
+          description: "共识高度在过去 5 分钟内没有增长，共识可能停止"
+          
+      # 共识轮次过高
+      - alert: HighConsensusRound
+        expr: aiw3_consensus_round > 5
+        for: 1m
+        labels:
+          severity: warning
+          category: consensus
+        annotations:
+          summary: "共识轮次过高 (节点: {{ $labels.node }})"
+          description: "当前轮次为 {{ $value }}，可能存在网络问题或验证者不一致"
+          
+      # 共识轮次异常高
+      - alert: CriticalConsensusRound
+        expr: aiw3_consensus_round > 10
+        for: 30s
+        labels:
+          severity: critical
+          category: consensus
+        annotations:
+          summary: "共识轮次异常高 (节点: {{ $labels.node }})"
+          description: "当前轮次为 {{ $value }}，共识严重受阻"
+          
+      # 共识高度落后
+      - alert: ConsensusHeightLag
+        expr: (max(aiw3_consensus_height) - aiw3_consensus_height) > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: consensus
+        annotations:
+          summary: "共识高度落后 (节点: {{ $labels.node }})"
+          description: "节点共识高度落后最高节点 {{ $value }} 个区块"
+          
+      # 共识步骤异常
+      - alert: ConsensusStepAnomaly
+        expr: aiw3_consensus_step < 1 or aiw3_consensus_step > 4
+        for: 1m
+        labels:
+          severity: warning
+          category: consensus
+        annotations:
+          summary: "共识步骤异常 (节点: {{ $labels.node }})"
+          description: "共识步骤值为 {{ $value }}，超出正常范围 (1-4)"
 
   - name: performance_alerts
     interval: 30s
