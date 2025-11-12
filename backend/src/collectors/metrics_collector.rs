@@ -388,6 +388,31 @@ impl MetricsCollector {
             }
         }
 
+        // 采集 Mempool 指标
+        match blockchain_collector.collect_mempool_metrics().await {
+            Ok(mempool_metrics) => {
+                debug!(
+                    "Collected mempool metrics for {}: unconfirmed={}, total={}, size={}",
+                    node.name,
+                    mempool_metrics.unconfirmed_txs,
+                    mempool_metrics.total_txs,
+                    mempool_metrics.mempool_size_bytes
+                );
+
+                // 更新 Prometheus 指标
+                self.metrics_registry.set_mempool_metrics(
+                    &mempool_metrics,
+                    &node.name,
+                    &node.environment,
+                );
+
+                // TODO: 将 Mempool 指标存储到数据库
+            }
+            Err(e) => {
+                warn!("Failed to collect mempool metrics from {}: {}", node.name, e);
+            }
+        }
+
         // 采集共识状态指标
         match blockchain_collector.collect_consensus_metrics().await {
             Ok(consensus_metrics) => {

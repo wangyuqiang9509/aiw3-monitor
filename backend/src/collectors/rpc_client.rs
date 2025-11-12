@@ -213,17 +213,13 @@ impl RpcClient {
     ) -> Result<ValidatorsResult> {
         debug!("Fetching validators from {} (height: {:?})", self.rpc_url, height);
 
-        let mut params: Vec<serde_json::Value> = vec![];
+        // CometBFT RPC 要求必须提供所有 3 个参数
+        // height 参数：None 时使用 null（表示最新高度），Some 时转为字符串
+        let height_param = height.map(|h| json!(h.to_string())).unwrap_or(json!(null));
+        let page_param = json!(page.unwrap_or(1).to_string());
+        let per_page_param = json!(per_page.unwrap_or(100).to_string());
 
-        if let Some(h) = height {
-            params.push(json!(h.to_string()));
-        }
-        if let Some(p) = page {
-            params.push(json!(p.to_string()));
-        }
-        if let Some(pp) = per_page {
-            params.push(json!(pp.to_string()));
-        }
+        let params = vec![height_param, page_param, per_page_param];
 
         let operation = || async {
             self.client
